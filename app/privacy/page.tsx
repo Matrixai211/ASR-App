@@ -1,1 +1,14 @@
-export default function Privacy(){return <main><section className="hero"><div className="eyebrow">PRIVACY</div><h1>Your data matters.</h1><p>ASR is designed around data minimization, server-side secrets and role-based access. Final policy must match deployed processors and jurisdictions.</p></section></main>
+export default function Privacy() {
+  return (
+    <main>
+      <section className="hero">
+        <div className="eyebrow">PRIVACY</div>
+        <h1>Your data matters.</h1>
+        <p>
+          ASR is designed around data minimization, server-side secrets and role-based access.
+          Final policy must match deployed processors and jurisdictions.
+        </p>
+      </section>
+    </main>
+  );
+}
