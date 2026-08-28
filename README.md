@@ -1,6 +1,6 @@
 # ASR App
 
-ASR (African Sound Revolution) is a distribution-first music platform combining streaming, artist distribution and direct music commerce.
+ASR (Asap Shimmy Records) is a distribution-first music platform combining streaming, artist distribution and direct music commerce.
 
 ## Included in this starter
 - Artist Studio
