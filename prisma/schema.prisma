@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole { LISTENER ARTIST ADMIN MODERATOR }
+enum ReleaseStatus { DRAFT SUBMITTED IN_REVIEW CHANGES_REQUESTED APPROVED PUBLISHED REJECTED }
+enum ReleaseType { SINGLE EP ALBUM }
+enum SubscriptionTier { FREE PREMIUM ARTIST }
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  name String?
+  role UserRole @default(LISTENER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  artistProfile ArtistProfile?
+  subscription Subscription?
+}
+
+model ArtistProfile {
+  id String @id @default(cuid())
+  userId String @unique
+  stageName String
+  bio String?
+  country String?
+  verified Boolean @default(false)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  releases Release[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Release {
+  id String @id @default(cuid())
+  artistId String
+  title String
+  type ReleaseType
+  genre String?
+  language String?
+  artworkUrl String?
+  releaseDate DateTime?
+  status ReleaseStatus @default(DRAFT)
+  exclusive Boolean @default(false)
+  downloadable Boolean @default(false)
+  priceCents Int?
+  artist ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks Track[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Track {
+  id String @id @default(cuid())
+  releaseId String
+  title String
+  trackNumber Int
+  audioUrl String?
+  durationSeconds Int?
+  explicit Boolean @default(false)
+  isrc String? @unique
+  priceCents Int?
+  release Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id String @id @default(cuid())
+  userId String @unique
+  tier SubscriptionTier @default(FREE)
+  provider String?
+  providerCustomerId String?
+  providerSubscriptionId String?
+  active Boolean @default(true)
+  renewsAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
