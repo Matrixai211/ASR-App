@@ -1,0 +1,1 @@
+export const featured=[{id:'asr-001',title:'Midnight Kampala',artist:'ASR Select',genre:'Afrobeats'},{id:'asr-002',title:'East African Frequency',artist:'ASR Select',genre:'Dancehall'},{id:'asr-003',title:'New Wave',artist:'ASR Select',genre:'Amapiano'}];

@@ -1,0 +1,1 @@
+export default function Library(){return <main><nav className="nav"><a className="brand" href="/">ASR<span>.</span></a><a href="/listen">Listen</a></nav><section className="hero"><div className="eyebrow">YOUR LIBRARY</div><h1>Saved for you.</h1><p>Liked tracks, albums, playlists and purchased downloads will live here after sign-in.</p></section></main>}

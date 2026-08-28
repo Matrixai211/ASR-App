@@ -1,0 +1,11 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: asr
+      POSTGRES_USER: asr
+      POSTGRES_PASSWORD: asr_local
+    ports: ["5432:5432"]
+    volumes: ["asr_db:/var/lib/postgresql/data"]
+volumes:
+  asr_db:

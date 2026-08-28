@@ -1,0 +1,1 @@
+import {NextResponse} from 'next/server';export async function GET(_:Request,{params}:{params:Promise<{trackId:string}>}){const {trackId}=await params;return NextResponse.json({trackId,status:'media_storage_required',message:'Playback activates after a published track has a secured audio object.'},{status:501})}

@@ -1,0 +1,1 @@
+export default function Terms(){return <main><section className="hero"><div className="eyebrow">LEGAL</div><h1>ASR Terms.</h1><p>Before public launch, ASR must publish jurisdiction-reviewed platform, artist distribution, commerce, copyright and privacy terms.</p></section></main>}

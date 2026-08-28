@@ -1,0 +1,1 @@
+import {NextRequest,NextResponse} from 'next/server';import {featured} from '../../../lib/catalog';export async function GET(req:NextRequest){const q=(req.nextUrl.searchParams.get('q')||'').toLowerCase();return NextResponse.json({query:q,results:featured.filter(x=>`${x.title} ${x.artist} ${x.genre}`.toLowerCase().includes(q))})}

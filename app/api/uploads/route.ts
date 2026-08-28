@@ -1,0 +1,1 @@
+import {NextResponse} from 'next/server';export async function POST(){return NextResponse.json({status:'configuration_required',message:'Configure S3-compatible object storage before accepting audio or artwork.'},{status:501})}
