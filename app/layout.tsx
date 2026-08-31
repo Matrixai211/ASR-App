@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'ASR — African Sound & Releases',
@@ -9,9 +10,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: '#090909', color: '#f7f7f7', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
