@@ -35,6 +35,13 @@ enum SubscriptionTier {
   ARTIST
 }
 
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  CANCELLED
+}
+
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
@@ -48,6 +55,8 @@ model User {
   accounts      Account[]
   artistProfile ArtistProfile?
   subscription  Subscription?
+  playEvents    PlayEvent[]
+  payments      PaymentTransaction[]
 }
 
 model Session {
@@ -131,19 +140,35 @@ model Release {
 }
 
 model Track {
-  id              String   @id @default(cuid())
+  id              String      @id @default(cuid())
   releaseId       String
   title           String
   trackNumber     Int
   audioUrl        String?
   durationSeconds Int?
-  explicit        Boolean  @default(false)
-  isrc            String?  @unique
+  explicit        Boolean     @default(false)
+  isrc            String?     @unique
   priceCents      Int?
-  release         Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
+  release         Release     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  playEvents      PlayEvent[]
+  createdAt       DateTime    @default(now())
 
   @@index([releaseId])
+}
+
+model PlayEvent {
+  id              String   @id @default(cuid())
+  userId          String?
+  trackId         String
+  listenedSeconds Int      @default(0)
+  completed       Boolean  @default(false)
+  source          String?
+  createdAt       DateTime @default(now())
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  track           Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([trackId, createdAt])
 }
 
 model Subscription {
@@ -158,4 +183,23 @@ model Subscription {
   user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
+}
+
+model PaymentTransaction {
+  id                    String        @id @default(cuid())
+  userId                String
+  txRef                 String        @unique
+  provider              String        @default("flutterwave")
+  providerTransactionId String?       @unique
+  tier                  SubscriptionTier
+  amountMinor           Int
+  currency              String        @default("UGX")
+  status                PaymentStatus @default(PENDING)
+  paidAt                DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
 }
