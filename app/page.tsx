@@ -3,7 +3,7 @@ const links = [
   ['Search', '/search'],
   ['Library', '/library'],
   ['Store', '/store'],
-  ['Admin', '/admin'],
+  ['Account', '/auth'],
 ];
 
 export default function HomePage() {
@@ -22,7 +22,7 @@ export default function HomePage() {
         <p style={{ maxWidth: 680, marginTop: 30, color: '#b8b8b8', fontSize: 'clamp(18px, 2vw, 23px)', lineHeight: 1.5 }}>ASR brings discovery, artist releases, streaming, exclusives and merchandise into one platform built around African music and independent artists.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 34 }}>
           <a href="/listen" style={{ background: '#fff', color: '#090909', textDecoration: 'none', padding: '15px 22px', borderRadius: 999, fontWeight: 800 }}>Start listening</a>
-          <a href="/store" style={{ color: '#fff', textDecoration: 'none', padding: '14px 22px', borderRadius: 999, border: '1px solid #444', fontWeight: 700 }}>Explore the store</a>
+          <a href="/auth" style={{ color: '#fff', textDecoration: 'none', padding: '14px 22px', borderRadius: 999, border: '1px solid #444', fontWeight: 700 }}>Create an account</a>
         </div>
       </section>
 
