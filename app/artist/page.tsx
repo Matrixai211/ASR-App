@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '../../lib/auth';
 
 const steps = [
+  ['CACTUS MASTERS', 'Upload and attach ASAP Shimmy authorized Cactus masters.', '/artist/cactus'],
   ['NEW RELEASE', 'Create a single, EP or album submission.', '/artist/releases/new'],
   ['DRAFTS', 'Continue metadata, artwork and track preparation.', '/artist'],
   ['SUBMITTED', 'Track moderation and rights review status.', '/artist'],
