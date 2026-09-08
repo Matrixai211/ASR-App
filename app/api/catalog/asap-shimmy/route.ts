@@ -4,11 +4,41 @@ import { auth } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
 import { asapShimmy } from '../../../../lib/catalog';
 
+export async function GET() {
+  const release = await prisma.release.findFirst({
+    where: {
+      title: 'Cactus',
+      status: 'PUBLISHED',
+      artist: { stageName: asapShimmy.name },
+    },
+    include: { tracks: true },
+  });
+
+  if (!release) {
+    return NextResponse.json({ release: null, tracks: [] });
+  }
+
+  return NextResponse.json({
+    release: { id: release.id, title: release.title, status: release.status },
+    tracks: release.tracks
+      .sort((a, b) => a.trackNumber - b.trackNumber)
+      .map((track) => ({
+        id: track.id,
+        title: track.title,
+        trackNumber: track.trackNumber,
+        playable: Boolean(track.audioUrl),
+        streamUrl: track.audioUrl ? `/api/stream/${track.id}` : null,
+      })),
+  });
+}
+
 export async function POST() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
   const role = (session.user as { role?: string }).role;
-  if (!['ARTIST','ADMIN','MODERATOR'].includes(role || '')) return NextResponse.json({ error: 'Artist or staff access required' }, { status: 403 });
+  if (!['ARTIST', 'ADMIN', 'MODERATOR'].includes(role || '')) {
+    return NextResponse.json({ error: 'Artist or staff access required' }, { status: 403 });
+  }
 
   let artist = await prisma.artistProfile.findUnique({ where: { userId: session.user.id } });
   if (!artist) {
@@ -17,7 +47,10 @@ export async function POST() {
     });
   }
 
-  let release = await prisma.release.findFirst({ where: { artistId: artist.id, title: 'Cactus' }, include: { tracks: true } });
+  let release = await prisma.release.findFirst({
+    where: { artistId: artist.id, title: 'Cactus' },
+    include: { tracks: true },
+  });
   if (!release) {
     release = await prisma.release.create({
       data: {
@@ -42,7 +75,14 @@ export async function POST() {
       id: release.id,
       title: release.title,
       status: release.status,
-      tracks: release.tracks.sort((a,b) => a.trackNumber - b.trackNumber).map(t => ({ id: t.id, title: t.title, trackNumber: t.trackNumber, ready: Boolean(t.audioUrl) })),
+      tracks: release.tracks
+        .sort((a, b) => a.trackNumber - b.trackNumber)
+        .map((track) => ({
+          id: track.id,
+          title: track.title,
+          trackNumber: track.trackNumber,
+          ready: Boolean(track.audioUrl),
+        })),
     },
   });
 }
