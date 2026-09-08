@@ -1,9 +1,8 @@
-const CACTUS_COLLECTION_ID = 1708032597;
 const ASAP_SHIMMY_APPLE_ARTIST_URL = 'https://music.apple.com/us/artist/asap-shimmy/1557124466';
 
-type ItunesLookupItem = {
-  wrapperType?: string;
-  collectionId?: number;
+type ItunesSearchItem = {
+  artistName?: string;
+  collectionName?: string;
   artworkUrl100?: string;
 };
 
@@ -14,14 +13,19 @@ function resizeAppleArtwork(url: string, size: number) {
 export async function getCactusArtwork(size = 1200): Promise<string | null> {
   try {
     const response = await fetch(
-      `https://itunes.apple.com/lookup?id=${CACTUS_COLLECTION_ID}&entity=song&country=us`,
+      'https://itunes.apple.com/search?term=ASAP%20Shimmy%20Cactus&entity=album&country=us&limit=25',
       { next: { revalidate: 86400 } }
     );
 
     if (!response.ok) return null;
 
-    const payload = (await response.json()) as { results?: ItunesLookupItem[] };
-    const item = payload.results?.find(result => result.artworkUrl100);
+    const payload = (await response.json()) as { results?: ItunesSearchItem[] };
+    const item = payload.results?.find(result =>
+      result.artistName?.toLowerCase() === 'asap shimmy' &&
+      result.collectionName?.toLowerCase() === 'cactus' &&
+      result.artworkUrl100
+    ) || payload.results?.find(result => result.artworkUrl100);
+
     return item?.artworkUrl100 ? resizeAppleArtwork(item.artworkUrl100, size) : null;
   } catch {
     return null;
