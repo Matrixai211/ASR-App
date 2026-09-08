@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { asapShimmy, featured } from '../../../lib/catalog';
+import { getAsapShimmyArtistArtwork, getCactusArtwork } from '../../../lib/music-artwork';
 import { prisma } from '../../../lib/prisma';
 
 type SearchResult = {
@@ -9,11 +10,17 @@ type SearchResult = {
   subtitle?: string;
   href?: string;
   genre?: string;
+  artwork?: string;
 };
 
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get('q') || '').trim().toLowerCase();
   if (!q) return NextResponse.json({ query: q, results: [] });
+
+  const [cactusArtwork, artistArtwork] = await Promise.all([
+    getCactusArtwork(800),
+    getAsapShimmyArtistArtwork(800),
+  ]);
 
   const staticResults: SearchResult[] = [];
 
@@ -24,6 +31,7 @@ export async function GET(req: NextRequest) {
       title: asapShimmy.name,
       subtitle: 'Artist',
       href: '/artists/asap-shimmy',
+      artwork: artistArtwork || cactusArtwork || undefined,
     });
   }
 
@@ -35,6 +43,7 @@ export async function GET(req: NextRequest) {
       subtitle: `${asapShimmy.name} · ${asapShimmy.release.year}`,
       href: '/artists/asap-shimmy',
       genre: 'Afrosounds',
+      artwork: cactusArtwork || undefined,
     });
   }
 
@@ -46,12 +55,14 @@ export async function GET(req: NextRequest) {
         title,
         subtitle: `${asapShimmy.name} · Cactus`,
         href: '/artists/asap-shimmy',
+        artwork: cactusArtwork || undefined,
       });
     }
   }
 
   for (const item of featured) {
     if (`${item.title} ${item.artist} ${item.genre}`.toLowerCase().includes(q)) {
+      const isShimmy = item.artist.toLowerCase() === 'asap shimmy';
       staticResults.push({
         id: item.id,
         type: 'featured',
@@ -59,6 +70,7 @@ export async function GET(req: NextRequest) {
         subtitle: item.artist,
         href: 'href' in item ? item.href : '/listen',
         genre: item.genre,
+        artwork: isShimmy ? cactusArtwork || undefined : undefined,
       });
     }
   }
@@ -89,6 +101,7 @@ export async function GET(req: NextRequest) {
         title: a.stageName,
         subtitle: 'Artist',
         href: a.stageName.toLowerCase() === 'asap shimmy' ? '/artists/asap-shimmy' : '/search',
+        artwork: a.stageName.toLowerCase() === 'asap shimmy' ? artistArtwork || cactusArtwork || undefined : undefined,
       })),
       ...releases.map(r => ({
         id: `db-release-${r.id}`,
@@ -97,6 +110,7 @@ export async function GET(req: NextRequest) {
         subtitle: r.artist.stageName,
         href: r.artist.stageName.toLowerCase() === 'asap shimmy' ? '/artists/asap-shimmy' : '/listen',
         genre: r.genre || undefined,
+        artwork: r.artist.stageName.toLowerCase() === 'asap shimmy' ? cactusArtwork || undefined : undefined,
       })),
       ...tracks.map(t => ({
         id: `db-track-${t.id}`,
@@ -104,6 +118,7 @@ export async function GET(req: NextRequest) {
         title: t.title,
         subtitle: `${t.release.artist.stageName} · ${t.release.title}`,
         href: t.release.artist.stageName.toLowerCase() === 'asap shimmy' ? '/artists/asap-shimmy' : '/listen',
+        artwork: t.release.artist.stageName.toLowerCase() === 'asap shimmy' ? cactusArtwork || undefined : undefined,
       })),
     ];
   } catch {
