@@ -291,8 +291,15 @@ export default function SpotifyASR() {
     setTitle('Liked Songs');
     setSubtitle('Saved in your connected Spotify library.');
     try {
-      const payload = await api('/me/tracks?limit=50');
-      const tracks = (payload?.items || []).map((item: any) => normalizeTrack(item.track)).filter(Boolean);
+      let payload: any;
+      try {
+        payload = await api('/me/library?limit=50');
+      } catch {
+        payload = await api('/me/tracks?limit=50');
+      }
+      const tracks = (payload?.items || [])
+        .map((item: any) => normalizeTrack(item.item || item.track || item))
+        .filter(Boolean);
       setSections([{ type: 'tracks', title: 'Liked Songs', tracks }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load liked songs.');
@@ -437,7 +444,11 @@ export default function SpotifyASR() {
 
   const saveTrack = useCallback(async (track: SpotifyTrack) => {
     try {
-      await api('/me/tracks?ids=' + encodeURIComponent(track.id), { method: 'PUT' });
+      try {
+        await api('/me/library', { method: 'PUT', body: { uris: [track.uri] } });
+      } catch {
+        await api('/me/tracks?ids=' + encodeURIComponent(track.id), { method: 'PUT' });
+      }
       setMessage('Saved “' + track.name + '” to Liked Songs.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save track.');
@@ -709,7 +720,7 @@ export default function SpotifyASR() {
     return <section className="connected-setup">
       <div className="eyebrow">CONNECTED MUSIC · SPOTIFY</div>
       <h2>Bring your library into ASR.</h2>
-      <p>Connect a Spotify developer app with Authorization Code + PKCE. No client secret is stored in ASR. Browser playback requires Spotify Premium.</p>
+      <p>Connect the ASR Spotify developer app with Authorization Code + PKCE. No client secret is stored in ASR. Spotify Development Mode and browser playback require the app owner to have Spotify Premium.</p>
       <label className="connected-label">
         Spotify Client ID
         <input className="connected-input" value={clientId} onChange={event => setClientId(event.target.value)} placeholder="Paste Spotify Client ID" autoComplete="off" />
