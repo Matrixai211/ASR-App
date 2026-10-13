@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { asapShimmy } from '../../../lib/catalog';
+import { type ASRPlayerTrack, useASRPlayer } from '../../../components/ASRPlayer';
 
 type ItunesAlbum = {
   artistName?: string;
@@ -29,6 +30,7 @@ function upscaleArtwork(url: string, size = 1200) {
 }
 
 export default function AsapShimmyPage() {
+  const player = useASRPlayer();
   const [cactusArtwork, setCactusArtwork] = useState<string | null>(null);
   const [publishedTracks, setPublishedTracks] = useState<PublishedTrack[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -79,17 +81,43 @@ export default function AsapShimmyPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const liveByTitle = new Map(publishedTracks.map(track => [track.title.toLowerCase(), track]));
+  const liveByTitle = useMemo(
+    () => new Map(publishedTracks.map(track => [track.title.toLowerCase(), track])),
+    [publishedTracks],
+  );
+
+  const playableQueue = useMemo<ASRPlayerTrack[]>(() => {
+    return asapShimmy.release.tracks.flatMap((title, index) => {
+      const key = title.toLowerCase();
+      const liveTrack = liveByTitle.get(key);
+      const nativeSource = liveTrack?.playable && liveTrack.streamUrl ? liveTrack.streamUrl : null;
+      const source = nativeSource || previews[key];
+      if (!source) return [];
+
+      return [{
+        id: liveTrack?.id || `asap-shimmy-cactus-${String(index + 1).padStart(2, '0')}`,
+        title,
+        artist: 'ASAP Shimmy',
+        album: 'Cactus',
+        artwork: cactusArtwork,
+        src: source,
+        sourceLabel: nativeSource ? 'FULL ASR MASTER' : 'ASR PREVIEW SOURCE',
+      }];
+    });
+  }, [cactusArtwork, liveByTitle, previews]);
 
   return <main>
-    <nav className="nav"><a className="brand" href="/">ASR<span>.</span></a><div><a href="/listen">Listen</a> · <a href="/search">Search</a> · <a href="/premium">Premium</a></div></nav>
+    <nav className="nav"><a className="brand" href="/">ASR<span>.</span></a><div><a href="/listen">Listen</a> · <a href="/search">Search</a> · <a href="/player">Player</a> · <a href="/premium">Premium</a></div></nav>
 
     <section className="hero artist-hero-grid">
       <div>
         <div className="eyebrow">FEATURED ARTIST</div>
         <h1>{asapShimmy.name}</h1>
         <p>{asapShimmy.bio}</p>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:24}}>{asapShimmy.platforms.map(platform => <a className="play" style={{textDecoration:'none'}} key={platform.name} href={platform.url} target="_blank" rel="noreferrer">{platform.name}</a>)}</div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:24}}>
+          {playableQueue.length > 0 && <button className="play" onClick={() => player.playQueue(playableQueue, 0)}>▶ Play Cactus in ASR</button>}
+          {asapShimmy.platforms.map(platform => <a className="play secondary-play" style={{textDecoration:'none'}} key={platform.name} href={platform.url} target="_blank" rel="noreferrer">{platform.name}</a>)}
+        </div>
       </div>
       {cactusArtwork ? <img className="artist-portrait" src={cactusArtwork} alt="ASAP Shimmy — Cactus artwork" /> : <div className="artist-portrait cover">ASAP<br/>SHIMMY</div>}
     </section>
@@ -100,27 +128,35 @@ export default function AsapShimmyPage() {
         <div className="eyebrow">ALBUM · 2023</div>
         <h2 style={{fontSize:'clamp(34px,5vw,64px)',margin:'10px 0'}}>Cactus</h2>
         <p>19 tracks · ASAP Shimmy</p>
-        <p className="tag">ASR masters play in full when attached. Apple previews are used as a lawful fallback.</p>
+        <p className="tag">Powered by the independent ASR Player. Full ASR masters automatically replace fallback sources when attached.</p>
       </div>
     </section>
 
     <section className="grid">{asapShimmy.release.tracks.map((title, index) => {
       const key = title.toLowerCase();
       const liveTrack = liveByTitle.get(key);
-      const source = liveTrack?.playable && liveTrack.streamUrl ? liveTrack.streamUrl : previews[key];
-      const isPreview = !(liveTrack?.playable && liveTrack.streamUrl) && Boolean(previews[key]);
+      const nativeSource = liveTrack?.playable && liveTrack.streamUrl ? liveTrack.streamUrl : null;
+      const hasSource = Boolean(nativeSource || previews[key]);
+      const queueIndex = playableQueue.findIndex(track => track.title.toLowerCase() === key);
+      const isCurrent = player.currentTrack?.title.toLowerCase() === key && player.currentTrack.artist === 'ASAP Shimmy';
 
-      return <article className="card" key={title + '-' + index}>
+      return <article className={`card track-card ${isCurrent ? 'playing-card' : ''}`} key={title + '-' + index}>
         {cactusArtwork ? <img className="cover cover-img" src={cactusArtwork} alt={`${title} — Cactus artwork`} /> : <div className="cover">{String(index + 1).padStart(2, '0')}</div>}
-        <div className="tag">CACTUS</div>
+        <div className="tag">CACTUS · {String(index + 1).padStart(2, '0')}</div>
         <h3>{title}</h3>
         <p>ASAP Shimmy</p>
-        {source
-          ? <>
-              <audio controls preload="none" src={source} style={{width:'100%'}}>Your browser does not support audio playback.</audio>
-              <span className="tag">{isPreview ? 'Apple preview · full ASR master pending' : 'Full ASR master'}</span>
-            </>
-          : <span className="tag">Preview unavailable · ASR master pending</span>}
+        {hasSource
+          ? <button
+              className="play track-play"
+              onClick={() => {
+                if (isCurrent) player.togglePlay();
+                else player.playQueue(playableQueue, queueIndex);
+              }}
+            >
+              {isCurrent && player.isPlaying ? '❚❚ Pause' : '▶ Play in ASR'}
+            </button>
+          : <button className="play track-play" disabled>Source pending</button>}
+        <span className="tag">{nativeSource ? 'FULL ASR MASTER' : hasSource ? 'ASR PREVIEW SOURCE' : 'MASTER PENDING'}</span>
       </article>;
     })}</section>
   </main>;
