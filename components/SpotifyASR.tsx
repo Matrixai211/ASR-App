@@ -159,6 +159,8 @@ export default function SpotifyASR() {
     return window.location.origin + '/player';
   }, []);
 
+  const managedSpotifyClient = Boolean(process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID);
+
   const tokenRequest = useCallback(async (body: Record<string, string>) => {
     const cid = clientIdRef.current;
     if (!cid) throw new Error('Spotify Client ID is missing.');
@@ -720,16 +722,18 @@ export default function SpotifyASR() {
     return <section className="connected-setup">
       <div className="eyebrow">CONNECTED MUSIC · SPOTIFY</div>
       <h2>Bring your library into ASR.</h2>
-      <p>Connect the ASR Spotify developer app with Authorization Code + PKCE. No client secret is stored in ASR. Spotify Development Mode and browser playback require the app owner to have Spotify Premium.</p>
-      <label className="connected-label">
+      <p>Connect Spotify to ASR with Authorization Code + PKCE. No client secret is stored in ASR. Spotify Development Mode and browser playback require the app owner to have Spotify Premium.</p>
+      {!managedSpotifyClient && <label className="connected-label">
         Spotify Client ID
         <input className="connected-input" value={clientId} onChange={event => setClientId(event.target.value)} placeholder="Paste Spotify Client ID" autoComplete="off" />
-      </label>
+      </label>}
       <div className="connected-redirect">
-        <span>Redirect URI to register in Spotify</span>
+        <span>Spotify callback</span>
         <code>{redirectUri}</code>
       </div>
-      <button className="play connected-connect" onClick={() => void connect()}>Connect Spotify</button>
+      <button className="play connected-connect" onClick={() => void connect()}>
+        Connect Spotify
+      </button>
       {error && <div className="connected-alert">{error}</div>}
     </section>;
   }
