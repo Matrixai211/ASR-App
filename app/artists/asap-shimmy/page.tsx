@@ -9,6 +9,13 @@ type ItunesAlbum = {
   artworkUrl100?: string;
 };
 
+type ItunesTrack = {
+  artistName?: string;
+  collectionName?: string;
+  trackName?: string;
+  previewUrl?: string;
+};
+
 type PublishedTrack = {
   id: string;
   title: string;
@@ -24,14 +31,16 @@ function upscaleArtwork(url: string, size = 1200) {
 export default function AsapShimmyPage() {
   const [cactusArtwork, setCactusArtwork] = useState<string | null>(null);
   const [publishedTracks, setPublishedTracks] = useState<PublishedTrack[]>([]);
+  const [previews, setPreviews] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadPageData() {
-      const [artworkResult, catalogResult] = await Promise.allSettled([
+      const [artworkResult, catalogResult, previewResult] = await Promise.allSettled([
         fetch('https://itunes.apple.com/search?term=ASAP%20Shimmy%20Cactus&entity=album&country=us&limit=25'),
         fetch('/api/catalog/asap-shimmy'),
+        fetch('https://itunes.apple.com/search?term=ASAP%20Shimmy%20Cactus&entity=song&country=us&limit=200'),
       ]);
 
       if (artworkResult.status === 'fulfilled' && artworkResult.value.ok) {
@@ -48,6 +57,22 @@ export default function AsapShimmyPage() {
         const payload = await catalogResult.value.json() as { tracks?: PublishedTrack[] };
         if (!cancelled) setPublishedTracks(payload.tracks || []);
       }
+
+      if (previewResult.status === 'fulfilled' && previewResult.value.ok) {
+        const payload = await previewResult.value.json() as { results?: ItunesTrack[] };
+        const mapped: Record<string, string> = {};
+        for (const item of payload.results || []) {
+          if (
+            item.artistName?.toLowerCase() === 'asap shimmy' &&
+            item.collectionName?.toLowerCase() === 'cactus' &&
+            item.trackName &&
+            item.previewUrl
+          ) {
+            mapped[item.trackName.toLowerCase()] = item.previewUrl;
+          }
+        }
+        if (!cancelled) setPreviews(mapped);
+      }
     }
 
     void loadPageData();
@@ -57,7 +82,7 @@ export default function AsapShimmyPage() {
   const liveByTitle = new Map(publishedTracks.map(track => [track.title.toLowerCase(), track]));
 
   return <main>
-    <nav className="nav"><a className="brand" href="/">ASR<span>.</span></a><div><a href="/listen">Listen</a> · <a href="/premium">Premium</a></div></nav>
+    <nav className="nav"><a className="brand" href="/">ASR<span>.</span></a><div><a href="/listen">Listen</a> · <a href="/search">Search</a> · <a href="/premium">Premium</a></div></nav>
 
     <section className="hero artist-hero-grid">
       <div>
@@ -75,19 +100,27 @@ export default function AsapShimmyPage() {
         <div className="eyebrow">ALBUM · 2023</div>
         <h2 style={{fontSize:'clamp(34px,5vw,64px)',margin:'10px 0'}}>Cactus</h2>
         <p>19 tracks · ASAP Shimmy</p>
+        <p className="tag">ASR masters play in full when attached. Apple previews are used as a lawful fallback.</p>
       </div>
     </section>
 
     <section className="grid">{asapShimmy.release.tracks.map((title, index) => {
-      const liveTrack = liveByTitle.get(title.toLowerCase());
+      const key = title.toLowerCase();
+      const liveTrack = liveByTitle.get(key);
+      const source = liveTrack?.playable && liveTrack.streamUrl ? liveTrack.streamUrl : previews[key];
+      const isPreview = !(liveTrack?.playable && liveTrack.streamUrl) && Boolean(previews[key]);
+
       return <article className="card" key={title + '-' + index}>
         {cactusArtwork ? <img className="cover cover-img" src={cactusArtwork} alt={`${title} — Cactus artwork`} /> : <div className="cover">{String(index + 1).padStart(2, '0')}</div>}
         <div className="tag">CACTUS</div>
         <h3>{title}</h3>
         <p>ASAP Shimmy</p>
-        {liveTrack?.playable && liveTrack.streamUrl
-          ? <audio controls preload="none" src={liveTrack.streamUrl} style={{width:'100%'}}>Your browser does not support audio playback.</audio>
-          : <span className="tag">ASR master pending publication</span>}
+        {source
+          ? <>
+              <audio controls preload="none" src={source} style={{width:'100%'}}>Your browser does not support audio playback.</audio>
+              <span className="tag">{isPreview ? 'Apple preview · full ASR master pending' : 'Full ASR master'}</span>
+            </>
+          : <span className="tag">Preview unavailable · ASR master pending</span>}
       </article>;
     })}</section>
   </main>;
