@@ -212,13 +212,15 @@ export default function SpotifyASR() {
     }
 
     if (!response.ok) {
-      let detail = response.statusText;
+      let detail = response.statusText || 'Spotify request failed';
       try {
         const payload = await response.json();
         detail = payload?.error?.message || payload?.error_description || payload?.error || detail;
       } catch {}
-      const err = new Error(detail || 'Spotify request failed.') as Error & { status?: number };
+      const requestPath = path.startsWith('http') ? path : API + path;
+      const err = new Error(`Spotify ${response.status} on ${requestPath}: ${detail}`) as Error & { status?: number; path?: string };
       err.status = response.status;
+      err.path = requestPath;
       throw err;
     }
 
@@ -293,14 +295,9 @@ export default function SpotifyASR() {
     setTitle('Liked Songs');
     setSubtitle('Saved in your connected Spotify library.');
     try {
-      let payload: any;
-      try {
-        payload = await api('/me/library?limit=50');
-      } catch {
-        payload = await api('/me/tracks?limit=50');
-      }
+      const payload = await api('/me/tracks?limit=50');
       const tracks = (payload?.items || [])
-        .map((item: any) => normalizeTrack(item.item || item.track || item))
+        .map((item: any) => normalizeTrack(item.track))
         .filter(Boolean);
       setSections([{ type: 'tracks', title: 'Liked Songs', tracks }]);
     } catch (err) {
@@ -379,7 +376,7 @@ export default function SpotifyASR() {
     }
     setLoading(true);
     try {
-      const payload = await api('/search?type=track,album,artist,playlist&limit=12&q=' + encodeURIComponent(q));
+      const payload = await api('/search?type=track,album,artist,playlist&limit=10&q=' + encodeURIComponent(q));
       const next: SpotifySection[] = [];
       const tracks = (payload?.tracks?.items || []).map((item: any) => normalizeTrack(item)).filter(Boolean);
       const artists = (payload?.artists?.items || []).filter(Boolean).map((item: any) => normalizeCard('artist', item));
@@ -447,7 +444,7 @@ export default function SpotifyASR() {
   const saveTrack = useCallback(async (track: SpotifyTrack) => {
     try {
       try {
-        await api('/me/library', { method: 'PUT', body: { uris: [track.uri] } });
+        await api('/me/library?uris=' + encodeURIComponent(track.uri), { method: 'PUT' });
       } catch {
         await api('/me/tracks?ids=' + encodeURIComponent(track.id), { method: 'PUT' });
       }
@@ -527,9 +524,18 @@ export default function SpotifyASR() {
     const me = await api('/me');
     setProfile(me);
     setConnected(true);
-    await loadPlaylists();
     initSdk();
-    await refreshDevices();
+
+    const optional = await Promise.allSettled([
+      loadPlaylists(),
+      refreshDevices(),
+    ]);
+
+    const rejected = optional.find(result => result.status === 'rejected');
+    if (rejected && rejected.status === 'rejected') {
+      const reason = rejected.reason instanceof Error ? rejected.reason.message : String(rejected.reason);
+      setMessage('Spotify connected. Some library/device features are limited: ' + reason);
+    }
   }, [api, initSdk, loadPlaylists, refreshDevices]);
 
   useEffect(() => {
@@ -576,7 +582,11 @@ export default function SpotifyASR() {
         if (!cancelled) {
           setConnecting(false);
           setConnected(false);
-          setError(err instanceof Error ? err.message : 'Could not connect Spotify.');
+          const raw = err instanceof Error ? err.message : 'Could not connect Spotify.';
+          const guidance = raw.includes('Spotify 403')
+            ? raw + ' Development Mode denied this Spotify account. In Spotify Developer Dashboard → your ASR app → User Management, add the Spotify account you are signing in with. Also confirm the app owner has active Spotify Premium.'
+            : raw;
+          setError(guidance);
         }
       }
     }
@@ -653,7 +663,7 @@ export default function SpotifyASR() {
     const name = newPlaylist.trim();
     if (!name || !profile?.id) return;
     try {
-      await api('/users/' + profile.id + '/playlists', {
+      await api('/me/playlists', {
         method: 'POST',
         body: { name: name.slice(0, 100), public: false },
       });
