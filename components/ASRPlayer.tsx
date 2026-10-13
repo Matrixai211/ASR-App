@@ -36,6 +36,7 @@ type ASRPlayerContextValue = {
   playQueue: (tracks: ASRPlayerTrack[], index?: number) => void;
   selectTrack: (index: number) => void;
   togglePlay: () => void;
+  pause: () => void;
   previous: () => void;
   next: () => void;
   seek: (seconds: number) => void;
@@ -111,6 +112,10 @@ export function ASRPlayerProvider({ children }: { children: ReactNode }) {
     else audio.pause();
   }, [currentTrack]);
 
+  const pause = useCallback(() => {
+    audioRef.current?.pause();
+  }, []);
+
   const previous = useCallback(() => {
     const audio = audioRef.current;
     if (!queue.length || !audio) return;
@@ -176,6 +181,7 @@ export function ASRPlayerProvider({ children }: { children: ReactNode }) {
     playQueue,
     selectTrack,
     togglePlay,
+    pause,
     previous,
     next,
     seek,
@@ -184,7 +190,7 @@ export function ASRPlayerProvider({ children }: { children: ReactNode }) {
     setQueueOpen,
   }), [
     queue, currentIndex, currentTrack, isPlaying, currentTime, duration, volume,
-    repeat, queueOpen, playQueue, selectTrack, togglePlay, previous, next, seek,
+    repeat, queueOpen, playQueue, selectTrack, togglePlay, pause, previous, next, seek,
     setVolume, cycleRepeat,
   ]);
 
