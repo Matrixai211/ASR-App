@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../../lib/auth";
@@ -9,15 +9,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 60;
-
-function hasRunnerToken(request: Request) {
-  const expected = process.env.ASR_IMPORT_RUNNER_TOKEN || "";
-  const provided = new URL(request.url).searchParams.get("runnerToken") || "";
-  if (!expected || !provided) return false;
-  const left = Buffer.from(expected);
-  const right = Buffer.from(provided);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
 
 async function isAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -52,7 +43,7 @@ function signatureLooksAudio(buffer: Buffer) {
 
 export async function GET(request: Request, context: { params: Promise<{ importId: string }> }) {
   try {
-    if (!hasRunnerToken(request) && !(await isAdmin())) {
+    if (!(await isAdmin())) {
       return NextResponse.json({ error: "Admin or moderator access required" }, { status: 401 });
     }
     const { importId } = await context.params;

@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
@@ -17,15 +17,6 @@ type AudiusTrack = any;
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
-}
-
-function hasRunnerToken(request: Request) {
-  const expected = process.env.ASR_IMPORT_RUNNER_TOKEN || "";
-  const provided = new URL(request.url).searchParams.get("runnerToken") || "";
-  if (!expected || !provided) return false;
-  const left = Buffer.from(expected);
-  const right = Buffer.from(provided);
-  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 async function isAdmin() {
@@ -397,18 +388,12 @@ async function importTrack(trackId: string) {
 
 export async function GET(request: Request) {
   try {
-    const runner = hasRunnerToken(request);
-    if (!runner && !(await isAdmin())) {
+    if (!(await isAdmin())) {
       return NextResponse.json({ error: "Admin or moderator access required" }, { status: 401 });
     }
     const url = new URL(request.url);
     const action = url.searchParams.get("action") || "search";
-    if (action === "import") {
-      if (!runner) return NextResponse.json({ error: "Use POST to import from an authenticated admin session" }, { status: 405 });
-      const trackId = url.searchParams.get("trackId") || "";
-      const result = await importTrack(trackId);
-      return NextResponse.json(result, { status: result.duplicate ? 200 : 201 });
-    }
+    if (action === "import") return NextResponse.json({ error: "Use POST to import from an authenticated admin session" }, { status: 405 });
     if (action !== "search") return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     const query = (url.searchParams.get("query") || "ambient instrumental").slice(0, 120);
     const requestedLimit = Number(url.searchParams.get("limit") || 12);
