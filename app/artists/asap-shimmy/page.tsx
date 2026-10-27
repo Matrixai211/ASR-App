@@ -4,12 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { asapShimmy } from '../../../lib/catalog';
 import { type ASRPlayerTrack, useASRPlayer } from '../../../components/ASRPlayer';
 
-type ItunesAlbum = {
-  artistName?: string;
-  collectionName?: string;
-  artworkUrl100?: string;
-};
-
 type ItunesTrack = {
   artistName?: string;
   collectionName?: string;
@@ -31,7 +25,8 @@ function upscaleArtwork(url: string, size = 1200) {
 
 export default function AsapShimmyPage() {
   const player = useASRPlayer();
-  const [cactusArtwork, setCactusArtwork] = useState<string | null>(null);
+  const [cactusArtwork] = useState<string | null>('/api/artwork/cactus');
+  const [artistArtwork] = useState<string | null>('/api/artwork/asap-shimmy');
   const [publishedTracks, setPublishedTracks] = useState<PublishedTrack[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
 
@@ -39,21 +34,10 @@ export default function AsapShimmyPage() {
     let cancelled = false;
 
     async function loadPageData() {
-      const [artworkResult, catalogResult, previewResult] = await Promise.allSettled([
-        fetch('https://itunes.apple.com/search?term=ASAP%20Shimmy%20Cactus&entity=album&country=us&limit=25'),
+      const [catalogResult, previewResult] = await Promise.allSettled([
         fetch('/api/catalog/asap-shimmy'),
         fetch('https://itunes.apple.com/search?term=ASAP%20Shimmy%20Cactus&entity=song&country=us&limit=200'),
       ]);
-
-      if (artworkResult.status === 'fulfilled' && artworkResult.value.ok) {
-        const payload = await artworkResult.value.json() as { results?: ItunesAlbum[] };
-        const item = payload.results?.find(result =>
-          result.artistName?.toLowerCase() === 'asap shimmy' &&
-          result.collectionName?.toLowerCase() === 'cactus' &&
-          result.artworkUrl100
-        ) || payload.results?.find(result => result.artworkUrl100);
-        if (!cancelled && item?.artworkUrl100) setCactusArtwork(upscaleArtwork(item.artworkUrl100));
-      }
 
       if (catalogResult.status === 'fulfilled' && catalogResult.value.ok) {
         const payload = await catalogResult.value.json() as { tracks?: PublishedTrack[] };
@@ -119,7 +103,7 @@ export default function AsapShimmyPage() {
           {asapShimmy.platforms.map(platform => <a className="play secondary-play" style={{textDecoration:'none'}} key={platform.name} href={platform.url} target="_blank" rel="noreferrer">{platform.name}</a>)}
         </div>
       </div>
-      {cactusArtwork ? <img className="artist-portrait" src={cactusArtwork} alt="ASAP Shimmy — Cactus artwork" /> : <div className="artist-portrait cover">ASAP<br/>SHIMMY</div>}
+      {artistArtwork ? <img className="artist-portrait" src={artistArtwork} alt="Official ASAP Shimmy artist artwork" /> : <div className="artist-portrait cover">ASAP<br/>SHIMMY</div>}
     </section>
 
     <section className="hero album-spotlight">
