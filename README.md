@@ -13,9 +13,9 @@ ASR (Asap Shimmy Records) is a distribution-first music platform combining strea
 - Label services
 - Admin/moderation architecture
 - `/api/health` endpoint
-- A&R
+
 ## Stack
-Next.js App Router + TypeScript. PostgreSQL persistence, object storage, authentication and payment integrations are the next implementation layer.
+Next.js App Router + TypeScript, PostgreSQL with Prisma, Better Auth, Supabase Storage, and Pesapal payment integration.
 
 ## Run
 ```bash
@@ -24,12 +24,12 @@ npm run dev
 ```
 Open http://localhost:3000 and test GET /api/health.
 
+## Deployment
+Railway deployment setup, environment variables, staging safety, and production cutover are documented in [docs/RAILWAY_DEPLOYMENT.md](docs/RAILWAY_DEPLOYMENT.md). Use an isolated Neon branch for staging; do not point the first Railway deployment at the production database.
+
 ## Next milestones
-1. Authentication and artist profiles
-2. PostgreSQL/Prisma schema
-3. Audio and artwork storage
-4. Full release metadata and rights forms
-5. Moderation dashboard
-6. Catalog publishing
-7. Listener playback
-8. Subscription billing and commerce
+1. Complete staging deployment and verify environment configuration
+2. Verify artist release uploads against the real Supabase bucket
+3. Verify Premium access and Pesapal sandbox checkout end to end
+4. Merge the distribution and Premium work after checks pass
+5. Promote Railway from staging branch to `main` after validation
