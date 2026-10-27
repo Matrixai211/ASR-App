@@ -26,6 +26,11 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npm run build
+      - name: Sync schema for CI
+        run: npm run db:push
+        env:
+          DATABASE_URL: postgresql://asr:asr@localhost:5432/asr
+      - name: Build application
+        run: npm run build
         env:
           DATABASE_URL: postgresql://asr:asr@localhost:5432/asr
