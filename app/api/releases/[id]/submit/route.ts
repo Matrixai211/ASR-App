@@ -4,7 +4,6 @@ import { auth } from '../../../../../lib/auth';
 import { prisma } from '../../../../../lib/prisma';
 
 const allowedRoles = new Set(['ARTIST', 'ADMIN', 'MODERATOR']);
-const staffRoles = new Set(['ADMIN', 'MODERATOR']);
 const editableStatuses = new Set(['DRAFT', 'CHANGES_REQUESTED']);
 
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -19,7 +18,9 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     include: { artist: true, tracks: { orderBy: { trackNumber: 'asc' } } },
   });
   if (!release) return NextResponse.json({ error: 'Release not found' }, { status: 404 });
-  if (release.artist.userId !== session.user.id && !staffRoles.has(role)) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  if (release.artist.userId !== session.user.id) return NextResponse.json({ error: 'Only the release owner can attest to rights and submit this release' }, { status: 403 });
+  const body = await _.json().catch(() => null) as { rightsAttestation?: boolean } | null;
+  if (body?.rightsAttestation !== true) return NextResponse.json({ error: 'Confirm that you control or are authorized to distribute the recording and artwork' }, { status: 400 });
   if (!editableStatuses.has(release.status)) return NextResponse.json({ error: 'This release has already been submitted or published' }, { status: 409 });
 
   const missing: string[] = [];
@@ -42,7 +43,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const updated = await prisma.release.update({
     where: { id },
-    data: { status: 'SUBMITTED' },
+    data: { status: 'SUBMITTED', rightsAttestedAt: new Date(), rightsAttestedBy: session.user.id },
     include: { artist: true, tracks: { orderBy: { trackNumber: 'asc' } } },
   });
   return NextResponse.json({ ok: true, release: updated });
