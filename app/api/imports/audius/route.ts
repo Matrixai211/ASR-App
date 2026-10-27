@@ -301,6 +301,12 @@ async function importTrack(trackId: string) {
       storageBackend = "NEON_BYTEA";
       storageNote = errorMessage(storageError);
       if (storage) await storage.remove([objectKey]).catch(() => undefined);
+      if (process.env.ASR_ALLOW_NEON_AUDIO_FALLBACK !== "1") {
+        throw new Error("ASR Supabase object storage is unavailable; import stopped to avoid filling the Neon database. Storage error: " + storageNote);
+      }
+      if (downloaded.bytes.byteLength > 10 * 1024 * 1024) {
+        throw new Error("Neon audio fallback is limited to 10 MB per staged test import");
+      }
     }
 
     const record = await prisma.audiusImport.create({
