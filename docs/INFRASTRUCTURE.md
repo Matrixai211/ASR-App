@@ -8,59 +8,73 @@ This repository is the source of truth for ASR application and infrastructure co
 - Next.js application
 - PostgreSQL-compatible database
 - Better Auth
-- Local or provider-backed object storage
+- Supabase object storage
+- Pesapal sandbox for payment testing
 
-### Production / Preview
-- Vercel-compatible Next.js deployment
-- Neon PostgreSQL database
-- Better Auth using the application database
-- Object storage/CDN provider to be selected separately
-- Payment provider to be selected separately
+### Railway staging
+- Railway service sourced from `feature/artist-distribution-studio` while the current work is validated
+- A dedicated Neon staging branch or separate staging database
+- Better Auth using the staging database
+- Supabase storage with the ASR media bucket
+- Pesapal sandbox credentials
+
+### Railway production
+- Railway service sourced from `main` after the pull request passes CI and staging checks
+- Production Neon database
+- Better Auth using the production public URL
+- Supabase storage with the ASR media bucket
+- Pesapal live credentials only after sandbox payment flows have been verified
 
 ## Required environment variables
 
-Copy `.env.example` to a local `.env` file. Never commit real credentials.
+Configure secrets in Railway's service Variables settings. Never commit real credentials.
 
-Required for database-backed builds/runtime:
-- `DATABASE_URL`
+Required:
+- `DATABASE_URL`: PostgreSQL connection string with TLS enabled where required. It is read during the Docker build for Prisma configuration and again at runtime.
+- `BETTER_AUTH_SECRET`: a strong, unique authentication secret.
+- `BETTER_AUTH_URL`: the public URL of the deployed ASR app.
+- `NEXT_PUBLIC_APP_URL`: the same public app URL, used for payment callbacks and redirects.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only secret; never expose it through a `NEXT_PUBLIC_` variable.
+- `SUPABASE_STORAGE_BUCKET`, normally `asr-media`
+- `PESAPAL_ENV`: use `sandbox` for staging.
+- `PESAPAL_CONSUMER_KEY`
+- `PESAPAL_CONSUMER_SECRET`
+- `ASR_PREMIUM_PRICE_UGX`
 
-Required for authentication:
-- `BETTER_AUTH_SECRET`
-- `BETTER_AUTH_URL`
-
-Provider-specific storage and payment credentials will be added only when those integrations are implemented.
+Optional:
+- `PESAPAL_IPN_ID`: if unset, ASR attempts to register the IPN endpoint when starting checkout.
 
 ## Database lifecycle
 
 Prisma schema: `prisma/schema.prisma`
 
 Generate the client:
-
 ```bash
 npm run db:generate
 ```
 
-Synchronize a development/preview database:
-
+Synchronize a development or isolated staging database:
 ```bash
 npm run db:push
 ```
 
-The production database must be backed up/branched and schema changes verified before they are applied.
+Railway runs `npm run db:deploy` as a pre-deploy command. That script currently uses `prisma db push`, so keep the staging service pointed at a dedicated staging database until the release and schema have been reviewed. Back up and verify the production database before pointing production at any schema-sync operation.
 
 ## Deployment lifecycle
 
-1. GitHub `main` is the source branch.
-2. CI must pass `npm run build`.
-3. The deployment platform imports this repository rather than maintaining a separate copy of the code.
-4. Environment variables are configured in the deployment platform, never committed to Git.
-5. Deployment health is verified from the public application URL and `/api/health`.
+1. GitHub Actions must pass for the pull request.
+2. The Railway configuration in `.railway/railway.ts` targets the feature branch for staging.
+3. Set the staging `DATABASE_URL` and other required variables before deploying.
+4. Verify `/api/health`, registration/login, artist release submission, audio/artwork storage, Premium entitlements, downloads, and Pesapal sandbox callbacks.
+5. After staging succeeds and the pull request is merged, switch the Railway source branch to `main`, configure the production environment variables, and verify the live service before changing any custom-domain DNS.
 
 ## Recovery
 
-A lost deployment integration must not require rebuilding ASR. Reconnect/import `Matrixai211/ASR-App`, restore the required environment variables, connect the existing database, and deploy `main`.
+A lost deployment integration must not require rebuilding ASR. Reconnect the Railway service to `Matrixai211/ASR-App`, restore the required environment variables, connect the correct database, and deploy the intended branch.
 
-A lost database integration must not require changing application code. Connect a PostgreSQL database through `DATABASE_URL`, verify the target database, then synchronize the checked-in Prisma schema using the controlled database workflow.
+A lost database integration must not require changing application code. Connect the correct PostgreSQL database through `DATABASE_URL`, verify the target database, and run the controlled schema workflow.
 
 ## Boundaries
 
