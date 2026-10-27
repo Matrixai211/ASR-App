@@ -103,7 +103,7 @@ function summarizeTrack(track: AudiusTrack) {
     id: String(track.id || ""),
     title: String(track.title || "Untitled"),
     artistName,
-    sourceUrl: track.permalink || null,
+    sourceUrl: track.permalink ? (String(track.permalink).startsWith("http") ? track.permalink : "https://audius.co" + (String(track.permalink).startsWith("/") ? track.permalink : "/" + track.permalink)) : null,
     sourceLicense: track.license || null,
     licenseBasis: license.basis,
     durationSeconds: Number.isFinite(Number(track.duration)) ? Math.floor(Number(track.duration)) : null,
@@ -362,7 +362,7 @@ export async function GET(request: Request) {
     const query = (url.searchParams.get("query") || "ambient instrumental").slice(0, 120);
     const requestedLimit = Number(url.searchParams.get("limit") || 12);
     const limit = Math.min(20, Math.max(1, Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : 12));
-    const data = await audiusJson("/tracks/search?query=" + encodeURIComponent(query) + "&limit=" + limit + "&app_name=ASRRecords");
+    const data = await audiusJson("/tracks/search?query=" + encodeURIComponent(query) + "&limit=" + limit + "&gate_condition=ungated&app_name=ASRRecords");
     const tracks = Array.isArray(data) ? data : [];
     const results = tracks.map(summarizeTrack);
     return NextResponse.json({
