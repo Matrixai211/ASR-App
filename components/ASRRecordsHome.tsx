@@ -4,12 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { asapShimmy } from '../lib/catalog';
 import { type ASRPlayerTrack, useASRPlayer } from './ASRPlayer';
 
-type ItunesAlbum = {
-  artistName?: string;
-  collectionName?: string;
-  artworkUrl100?: string;
-};
-
 type ItunesTrack = {
   artistName?: string;
   collectionName?: string;
@@ -52,7 +46,7 @@ const merch = [
 export default function ASRRecordsHome() {
   const player = useASRPlayer();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [cactusArtwork, setCactusArtwork] = useState<string | null>(null);
+  const [cactusArtwork] = useState<string | null>('/api/artwork/cactus');
   const [publishedTracks, setPublishedTracks] = useState<PublishedTrack[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
 
@@ -60,21 +54,10 @@ export default function ASRRecordsHome() {
     let cancelled = false;
 
     async function loadRelease() {
-      const [artworkResult, catalogResult, previewResult] = await Promise.allSettled([
-        fetch('https://itunes.apple.com/search?term=ASAP%20Shimmy%20Cactus&entity=album&country=us&limit=25'),
+      const [catalogResult, previewResult] = await Promise.allSettled([
         fetch('/api/catalog/asap-shimmy'),
         fetch('https://itunes.apple.com/search?term=ASAP%20Shimmy%20Cactus&entity=song&country=us&limit=200'),
       ]);
-
-      if (artworkResult.status === 'fulfilled' && artworkResult.value.ok) {
-        const payload = await artworkResult.value.json() as { results?: ItunesAlbum[] };
-        const item = payload.results?.find(result =>
-          result.artistName?.toLowerCase() === 'asap shimmy' &&
-          result.collectionName?.toLowerCase() === 'cactus' &&
-          result.artworkUrl100
-        ) || payload.results?.find(result => result.artworkUrl100);
-        if (!cancelled && item?.artworkUrl100) setCactusArtwork(upscaleArtwork(item.artworkUrl100));
-      }
 
       if (catalogResult.status === 'fulfilled' && catalogResult.value.ok) {
         const payload = await catalogResult.value.json() as { tracks?: PublishedTrack[] };
@@ -221,6 +204,14 @@ export default function ASRRecordsHome() {
       <section id="artists" className="records-band orange">
         <div className="records-wrap">
           <h2>Artists</h2>
+          <a className="records-artist-feature" href="/artists/asap-shimmy">
+            <img src="/api/artwork/asap-shimmy" alt="Official ASAP Shimmy artist artwork" loading="lazy" />
+            <span className="records-artist-feature-overlay">
+              <small>ASR ARTIST</small>
+              <strong>ASAP SHIMMY</strong>
+              <span>Explore Cactus ↗</span>
+            </span>
+          </a>
           <ul className="records-roster">
             <li><a href="/artists/asap-shimmy">ASAP Shimmy</a></li>
           </ul>
