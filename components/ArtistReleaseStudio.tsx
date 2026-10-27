@@ -108,6 +108,7 @@ export default function ArtistReleaseStudio({ releaseId }: { releaseId?: string 
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [rightsAttestation, setRightsAttestation] = useState(false);
   const locked = Boolean(release && !editableStatuses.has(release.status));
 
   const refreshRelease = useCallback(async () => {
@@ -274,10 +275,18 @@ export default function ArtistReleaseStudio({ releaseId }: { releaseId?: string 
 
   async function submitRelease() {
     if (!releaseId) return;
+    if (!rightsAttestation) {
+      setMessage('Confirm that you control or are authorized to distribute this recording and artwork before submitting.');
+      return;
+    }
     if (!(await saveMetadata())) return;
     setBusy(true);
     try {
-      const response = await fetch('/api/releases/' + releaseId + '/submit', { method: 'POST' });
+      const response = await fetch('/api/releases/' + releaseId + '/submit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ rightsAttestation: true }),
+      });
       const payload = await response.json();
       if (!response.ok) {
         const missing = Array.isArray(payload.missing) ? ' Missing: ' + payload.missing.join(', ') + '.' : '';
@@ -397,7 +406,11 @@ export default function ArtistReleaseStudio({ releaseId }: { releaseId?: string 
           <section className="card" style={panelStyle}>
             <h2 style={{ margin: 0 }}>04 · Submit for review</h2>
             <p style={{ color: '#999', margin: 0 }}>ASR checks required metadata, rights ownership, cover artwork and every audio master. Submission does not publish the release automatically.</p>
-            {locked ? <p style={{ color: '#ffbd87', margin: 0 }}>This release is {release.status.replaceAll('_', ' ').toLowerCase()}. Editing and uploads are locked until ASR staff requests changes.</p> : <button className="btn" type="button" disabled={busy || Boolean(uploading)} onClick={() => void submitRelease()} style={{ margin: 0, justifySelf: 'start' }}>{busy ? 'Working…' : 'Save and submit for review'}</button>}
+            {!locked && <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: '#ccc', lineHeight: 1.5 }}>
+              <input type="checkbox" checked={rightsAttestation} onChange={event => setRightsAttestation(event.target.checked)} style={{ marginTop: 4 }} />
+              I confirm that I own or am authorized to distribute the submitted recordings and artwork, and that the credits and rights information are accurate.
+            </label>}
+            {locked ? <p style={{ color: '#ffbd87', margin: 0 }}>This release is {release.status.replaceAll('_', ' ').toLowerCase()}. Editing and uploads are locked until ASR staff requests changes.</p> : <button className="btn" type="button" disabled={busy || Boolean(uploading) || !rightsAttestation} onClick={() => void submitRelease()} style={{ margin: 0, justifySelf: 'start' }}>{busy ? 'Working…' : 'Save and submit for review'}</button>}
           </section>
         </div>
       )}
