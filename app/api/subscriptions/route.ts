@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
     currency: 'UGX',
     durationDays: 30,
     entitlements: {
-      exclusiveReleases: Boolean(session?.user),
-      eligibleDownloads: Boolean(session?.user),
+      exclusiveReleases: false,
+      eligibleDownloads: false,
       adFreePlayback: false,
       offlinePlayer: false,
       smartMixes: false,
