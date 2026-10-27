@@ -106,7 +106,7 @@ export async function GET(request: Request, context: { params: Promise<{ importI
     }
     const responseHeaders = new Headers();
     responseHeaders.set("Content-Type", imported.contentType);
-    responseHeaders.set("Content-Disposition", "inline; filename="" + imported.fileName.replaceAll(""", "") + """);
+    responseHeaders.set("Content-Disposition", 'inline; filename="' + imported.fileName.replaceAll('"', '') + '"');
     responseHeaders.set("Accept-Ranges", "bytes");
     responseHeaders.set("Cache-Control", "private, max-age=60");
     const contentLength = upstream.headers.get("content-length");
