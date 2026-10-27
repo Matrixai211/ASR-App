@@ -75,3 +75,16 @@ body{padding-bottom:96px}
 @media(max-width:820px){.records-menu-button{display:block}.records-nav{display:none;position:absolute;left:0;right:0;top:100%;background:#000;flex-direction:column;align-items:stretch;padding:8px clamp(16px,4vw,48px) 16px;border-bottom:1px solid rgba(255,255,255,.18);margin:0}.records-nav.open{display:flex}.records-nav a{padding:14px 12px;font-size:1.05rem}.records-featured{grid-template-columns:1fr;max-width:560px}.records-vinyl{top:18vw;right:-32vw;width:92vw;opacity:.86}.records-player-panel{grid-template-columns:1fr}.records-player-panel>div+div{border-left:0;border-top:2px solid #fff}.records-demo{align-items:flex-start;flex-direction:column}}
 @media(max-width:560px){.records-wordmark{font-size:clamp(8rem,45vw,14rem)}.records-hero{min-height:640px}.records-featured{margin-top:42px}.records-footer{padding-bottom:190px}}
 @media(prefers-reduced-motion:reduce){.records-vinyl{animation:none}}
+
+
+/* Real catalog imagery: official ASR / ASAP Shimmy artwork */
+.records-artist-feature{display:block;position:relative;isolation:isolate;overflow:hidden;aspect-ratio:2.2/1;min-height:220px;max-height:440px;margin:22px 0 30px;border:2px solid #000;background:#111;color:#fff;text-decoration:none}
+.records-artist-feature img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 38%;transition:transform .45s ease}
+.records-artist-feature:hover img{transform:scale(1.035)}
+.records-artist-feature:after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.25) 65%,rgba(0,0,0,.08))}
+.records-artist-feature-overlay{position:absolute;z-index:2;inset:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;padding:clamp(18px,4vw,42px);gap:8px}
+.records-artist-feature-overlay small{font-size:11px;letter-spacing:.2em;font-weight:900;color:#ff5c00}
+.records-artist-feature-overlay strong{font-family:Impact,Haettenschweiler,"Arial Narrow Bold","Arial Black",sans-serif;font-size:clamp(2.5rem,8vw,6.5rem);font-weight:400;line-height:.86;letter-spacing:.01em}
+.records-artist-feature-overlay>span:last-child{font-weight:900;font-size:14px;text-decoration:underline;text-underline-offset:4px}
+.records-sleeve img,.records-featured .records-sleeve img{display:block;width:100%;height:100%;object-fit:cover}
+@media(max-width:560px){.records-artist-feature{aspect-ratio:1.25/1;min-height:230px}.records-artist-feature-overlay strong{font-size:clamp(2.3rem,12vw,4rem)}}
