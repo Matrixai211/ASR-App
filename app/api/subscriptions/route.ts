@@ -6,23 +6,38 @@ import { getPremiumEntitlement } from '../../../lib/premium';
 
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers }).catch(() => null);
-  if (!session?.user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  const configuredPrice = Number(process.env.ASR_PREMIUM_PRICE_UGX);
+  const priceUgx = Number.isFinite(configuredPrice) && configuredPrice > 0 ? Math.round(configuredPrice) : null;
+  const publicPlan = {
+    priceUgx,
+    currency: 'UGX',
+    durationDays: 30,
+    entitlements: {
+      exclusiveReleases: Boolean(session?.user),
+      eligibleDownloads: Boolean(session?.user),
+      adFreePlayback: false,
+      offlinePlayer: false,
+      smartMixes: false,
+    },
+  };
+  if (!session?.user) {
+    return NextResponse.json({
+      ...publicPlan,
+      subscription: { tier: 'FREE', status: 'FREE', active: false, renewsAt: null },
+    });
+  }
 
   try {
     const entitlement = await getPremiumEntitlement(session.user.id);
-    const configuredPrice = Number(process.env.ASR_PREMIUM_PRICE_UGX);
-    const priceUgx = Number.isFinite(configuredPrice) && configuredPrice > 0 ? Math.round(configuredPrice) : null;
     const storedTier = entitlement.subscription?.tier;
     return NextResponse.json({
+      ...publicPlan,
       subscription: {
         tier: entitlement.active ? 'PREMIUM' : 'FREE',
         status: entitlement.active ? 'ACTIVE' : storedTier === 'PREMIUM' ? 'EXPIRED' : 'FREE',
         active: entitlement.active,
         renewsAt: entitlement.renewsAt,
       },
-      priceUgx,
-      currency: 'UGX',
-      durationDays: 30,
       entitlements: {
         exclusiveReleases: entitlement.active,
         eligibleDownloads: entitlement.active,
