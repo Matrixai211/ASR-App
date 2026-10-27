@@ -6,7 +6,7 @@ export const featured = [
 
 export const asapShimmy = {
   name: 'ASAP Shimmy',
-  bio: 'ASAP Shimmy is an independent artist connected to the Kampala and Atlanta music scenes, blending trap, Afrosounds and contemporary African influences into a genre-fluid sound. His 2023 album Cactus introduced a broad collaborative vision across 19 tracks. Working through AsapShimmyRecords/ASR and Bantu Vibes, he continues to build a catalog centered on independent ownership, cross-border collaboration and modern African music.',
+  bio: 'ASAP Shimmy is an independent artist connecting the sounds of Kampala and Atalanta, blending trap, Afrosounds, and contemporary African influences into a distinctive, genre-fluid style. His 2023 album Cactus spans 19 tracks and showcases a broad musical palette with a collaborative spirit. Working across AsapShimmyRecords/ASR and Bantu Vibes, he brings an independent, cross-border perspective to modern African music, with a sound built to move between scenes and audiences.',
   release: {
     title: 'Cactus',
     year: 2023,
