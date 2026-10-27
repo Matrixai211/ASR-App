@@ -158,21 +158,30 @@ function extOf(value) {
 
 async function downloadAudio(track) {
   const id = encodeURIComponent(String(track.id));
-  const queries = track.is_original_available === true
-    ? ["?original=true&app_name=ASRRecords", "?original=false&app_name=ASRRecords", "?app_name=ASRRecords"]
-    : ["?app_name=ASRRecords", "?original=false&app_name=ASRRecords"];
+  const endpoints = track.is_original_available === true
+    ? [
+        { path: "/download?original=true&app_name=ASRRecords", originalRequested: true },
+        { path: "/stream?app_name=ASRRecords", originalRequested: false },
+        { path: "/download?original=false&app_name=ASRRecords", originalRequested: false },
+        { path: "/download?app_name=ASRRecords", originalRequested: false }
+      ]
+    : [
+        { path: "/stream?app_name=ASRRecords", originalRequested: false },
+        { path: "/download?app_name=ASRRecords", originalRequested: false },
+        { path: "/download?original=false&app_name=ASRRecords", originalRequested: false }
+      ];
   let last = "No downloadable audio returned";
   for (const base of BASES) {
-    for (const query of queries) {
+    for (const endpoint of endpoints) {
       try {
-        const response = await fetch(base + "/tracks/" + id + "/download" + query, {
+        const response = await fetch(base + "/tracks/" + id + endpoint.path, {
           redirect: "follow",
           cache: "no-store",
           headers: { Accept: "audio/*,application/octet-stream", "User-Agent": "ASRRecords/0.4" },
           signal: AbortSignal.timeout(25000)
         });
         if (!response.ok) {
-          last = "Audius download HTTP " + response.status;
+          last = "Audius audio endpoint HTTP " + response.status;
           continue;
         }
         const bytes = await readLimited(response);
@@ -185,7 +194,7 @@ async function downloadAudio(track) {
         return {
           bytes,
           format,
-          isOriginal: track.is_original_available === true && query.includes("original=true") && (!originalExt || originalExt === format.ext)
+          isOriginal: track.is_original_available === true && endpoint.originalRequested && (!originalExt || originalExt === format.ext)
         };
       } catch (error) {
         last = message(error);
