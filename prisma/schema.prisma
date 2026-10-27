@@ -88,7 +88,7 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
-  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([issuer, accountId])
   @@index([userId])
@@ -119,39 +119,49 @@ model ArtistProfile {
 }
 
 model Release {
-  id           String        @id @default(cuid())
-  artistId     String
-  title        String
-  type         ReleaseType
-  genre        String?
-  language     String?
-  artworkUrl   String?
-  releaseDate  DateTime?
-  status       ReleaseStatus @default(DRAFT)
-  exclusive    Boolean       @default(false)
-  downloadable Boolean       @default(false)
-  priceCents   Int?
-  artist       ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  tracks       Track[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  artistId              String
+  title                 String
+  type                  ReleaseType
+  genre                 String?
+  language              String?
+  artworkUrl            String?
+  releaseDate           DateTime?
+  status                ReleaseStatus @default(DRAFT)
+  exclusive             Boolean       @default(false)
+  downloadable          Boolean       @default(false)
+  priceCents            Int?
+  copyrightOwner        String?
+  masterRightsOwner     String?
+  publishingRightsOwner String?
+  copyrightYear         Int?
+  upc                   String?       @unique
+  artist                ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks                Track[]
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   @@index([artistId])
+  @@index([status])
 }
 
 model Track {
-  id              String      @id @default(cuid())
-  releaseId       String
-  title           String
-  trackNumber     Int
-  audioUrl        String?
-  durationSeconds Int?
-  explicit        Boolean     @default(false)
-  isrc            String?     @unique
-  priceCents      Int?
-  release         Release     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  playEvents      PlayEvent[]
-  createdAt       DateTime    @default(now())
+  id               String      @id @default(cuid())
+  releaseId        String
+  title            String
+  trackNumber      Int
+  audioUrl         String?
+  durationSeconds  Int?
+  explicit         Boolean     @default(false)
+  isrc             String?     @unique
+  priceCents       Int?
+  featuredArtists  String?
+  producerCredits  String?
+  songwriterCredits String?
+  composerCredits  String?
+  release          Release     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  playEvents       PlayEvent[]
+  createdAt        DateTime    @default(now())
 
   @@index([releaseId])
 }
@@ -204,32 +214,31 @@ model PaymentTransaction {
   @@index([status])
 }
 
-
 model AudiusImport {
-  id                    String   @id @default(cuid())
-  providerTrackId       String   @unique
-  title                 String
-  artistName            String
-  sourceUrl             String?
-  sourceLicense         String?
-  licenseBasis          String
-  attributionText       String
-  originalFilename      String?
-  audioObjectKey        String?  @unique
-  audioData              Bytes?
-  storageBackend         String   @default("SUPABASE")
-  storageNote            String?
-  fileName              String
-  contentType            String
-  fileSizeBytes          Int
-  durationSeconds        Int?
-  isOriginal             Boolean  @default(false)
-  isDownloadable         Boolean  @default(false)
-  isOriginalAvailable    Boolean  @default(false)
-  sha256                 String
-  status                 String   @default("STAGED")
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  providerTrackId      String   @unique
+  title                String
+  artistName           String
+  sourceUrl            String?
+  sourceLicense        String?
+  licenseBasis         String
+  attributionText      String
+  originalFilename     String?
+  audioObjectKey       String?  @unique
+  audioData            Bytes?
+  storageBackend       String   @default("SUPABASE")
+  storageNote          String?
+  fileName             String
+  contentType          String
+  fileSizeBytes        Int
+  durationSeconds      Int?
+  isOriginal           Boolean  @default(false)
+  isDownloadable       Boolean  @default(false)
+  isOriginalAvailable  Boolean  @default(false)
+  sha256               String
+  status               String   @default("STAGED")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([artistName])
   @@index([status])
