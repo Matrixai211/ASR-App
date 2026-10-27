@@ -215,7 +215,10 @@ model AudiusImport {
   licenseBasis          String
   attributionText       String
   originalFilename      String?
-  audioObjectKey        String   @unique
+  audioObjectKey        String?  @unique
+  audioData              Bytes?
+  storageBackend         String   @default("SUPABASE")
+  storageNote            String?
   fileName              String
   contentType            String
   fileSizeBytes          Int

@@ -179,6 +179,17 @@ function detectAudioFormat(buffer: Buffer, contentType = "", fileName = "") {
   return null;
 }
 
+function hasAudioSignature(buffer: Buffer) {
+  const first = buffer.subarray(0, 16).toString("ascii");
+  if (first.startsWith("RIFF") && first.slice(8, 12) === "WAVE") return true;
+  if (first.startsWith("fLaC") || first.startsWith("OggS") || first.startsWith("ID3") || first.slice(4, 8) === "ftyp") return true;
+  const searchLength = Math.min(buffer.length - 1, 4096);
+  for (let index = 0; index < searchLength; index += 1) {
+    if (buffer[index] === 255 && (buffer[index + 1] & 224) === 224) return true;
+  }
+  return false;
+}
+
 function safeFileName(value: string) {
   const cleaned = value.split("").map((char) => /[a-zA-Z0-9._-]/.test(char) ? char : "-").join("");
   return cleaned.replaceAll("--", "-").slice(0, 120) || "audio";
@@ -260,6 +271,8 @@ async function importTrack(trackId: string) {
       artistName: existing.artistName,
       contentType: existing.contentType,
       fileSizeBytes: existing.fileSizeBytes,
+      storageBackend: existing.storageBackend,
+      storageNote: existing.storageNote,
       sha256: existing.sha256,
       licenseBasis: existing.licenseBasis,
       attributionText: existing.attributionText,
@@ -280,15 +293,24 @@ async function importTrack(trackId: string) {
   const sha256 = createHash("sha256").update(downloaded.bytes).digest("hex");
   let uploaded = false;
   let createdId = "";
+  let storageBackend = "SUPABASE";
+  let storageNote: string | null = null;
   try {
-    const storage = supabaseAdmin().storage.from(supabaseBucket);
-    const upload = await storage.upload(objectKey, downloaded.bytes, {
-      contentType: downloaded.format.contentType,
-      cacheControl: "31536000",
-      upsert: false,
-    });
-    if (upload.error) throw new Error("ASR storage upload failed: " + upload.error.message);
-    uploaded = true;
+    let storage: any = null;
+    try {
+      storage = supabaseAdmin().storage.from(supabaseBucket);
+      const upload = await storage.upload(objectKey, downloaded.bytes, {
+        contentType: downloaded.format.contentType,
+        cacheControl: "31536000",
+        upsert: false,
+      });
+      if (upload.error) throw new Error(upload.error.message);
+      uploaded = true;
+    } catch (storageError) {
+      storageBackend = "NEON_BYTEA";
+      storageNote = errorMessage(storageError);
+      if (storage) await storage.remove([objectKey]).catch(() => undefined);
+    }
 
     const record = await prisma.audiusImport.create({
       data: {
@@ -300,7 +322,10 @@ async function importTrack(trackId: string) {
         licenseBasis: summary.licenseBasis,
         attributionText,
         originalFilename: originalFilename || null,
-        audioObjectKey: objectKey,
+        audioObjectKey: storageBackend === "SUPABASE" ? objectKey : null,
+        audioData: storageBackend === "NEON_BYTEA" ? downloaded.bytes : null,
+        storageBackend,
+        storageNote,
         fileName,
         contentType: downloaded.format.contentType,
         fileSizeBytes: downloaded.bytes.byteLength,
@@ -314,16 +339,31 @@ async function importTrack(trackId: string) {
     });
     createdId = record.id;
 
-    const signed = await storage.createSignedUrl(objectKey, 120);
-    if (signed.error || !signed.data?.signedUrl) throw new Error("ASR storage verification could not create a signed URL");
-    const verification = await fetch(signed.data.signedUrl, {
-      headers: { Range: "bytes=0-4095" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!verification.ok && verification.status !== 206) throw new Error("ASR storage verification returned HTTP " + verification.status);
-    const prefix = await readPrefix(verification, 4096);
-    if (!detectAudioFormat(prefix, downloaded.format.contentType, fileName)) throw new Error("Stored audio bytes failed format verification");
+    if (storageBackend === "SUPABASE") {
+      if (!storage) throw new Error("ASR storage client was unavailable after upload");
+      const signed = await storage.createSignedUrl(objectKey, 120);
+      if (signed.error || !signed.data?.signedUrl) throw new Error("ASR storage verification could not create a signed URL");
+      const verification = await fetch(signed.data.signedUrl, {
+        headers: { Range: "bytes=0-4095" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!verification.ok && verification.status !== 206) throw new Error("ASR storage verification returned HTTP " + verification.status);
+      const prefix = await readPrefix(verification, 4096);
+      if (!hasAudioSignature(prefix)) throw new Error("Stored audio bytes failed signature verification");
+    } else {
+      const persisted = await prisma.audiusImport.findUnique({
+        where: { id: record.id },
+        select: { audioData: true, fileSizeBytes: true, sha256: true },
+      });
+      if (!persisted?.audioData) throw new Error("Neon audio fallback did not persist the audio bytes");
+      const persistedBytes = Buffer.from(persisted.audioData);
+      const persistedHash = createHash("sha256").update(persistedBytes).digest("hex");
+      if (persistedBytes.byteLength !== record.fileSizeBytes || persistedHash !== record.sha256) {
+        throw new Error("Neon audio fallback failed byte-count or SHA-256 verification");
+      }
+      if (!hasAudioSignature(persistedBytes.subarray(0, 4096))) throw new Error("Neon audio fallback failed signature verification");
+    }
 
     return {
       ok: true,
@@ -339,6 +379,8 @@ async function importTrack(trackId: string) {
       fileName: record.fileName,
       contentType: record.contentType,
       fileSizeBytes: record.fileSizeBytes,
+      storageBackend: record.storageBackend,
+      storageNote: record.storageNote,
       isOriginal: record.isOriginal,
       isOriginalAvailable: record.isOriginalAvailable,
       sha256: record.sha256,

@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../../lib/auth";
@@ -60,13 +60,74 @@ export async function GET(request: Request, context: { params: Promise<{ importI
     if (!imported || imported.status !== "STAGED") {
       return NextResponse.json({ error: "Staged import not found" }, { status: 404 });
     }
+    const url = new URL(request.url);
+    if (imported.storageBackend === "NEON_BYTEA") {
+      const bytes = imported.audioData ? Buffer.from(imported.audioData) : null;
+      if (!bytes?.byteLength) return NextResponse.json({ error: "Staged database audio bytes are missing" }, { status: 503 });
+      const signatureVerified = signatureLooksAudio(bytes.subarray(0, 4096));
+      const hashVerified = createHash("sha256").update(bytes).digest("hex") === imported.sha256;
+      if (url.searchParams.get("probe") === "1") {
+        return NextResponse.json({
+          ok: signatureVerified && hashVerified,
+          importId: imported.id,
+          status: imported.status,
+          title: imported.title,
+          artistName: imported.artistName,
+          storageBackend: imported.storageBackend,
+          storedContentType: imported.contentType,
+          storedBytes: bytes.byteLength,
+          sampleBytesRead: Math.min(bytes.byteLength, 4096),
+          sampleHeaderHex: bytes.subarray(0, 16).toString("hex"),
+          audioSignatureVerified: signatureVerified,
+          sha256Verified: hashVerified,
+          sha256: imported.sha256,
+          playbackRoute: "/api/imports/audius/" + imported.id + "/stream",
+        }, { status: signatureVerified && hashVerified ? 200 : 502 });
+      }
+
+      let start = 0;
+      let end = bytes.byteLength - 1;
+      let status = 200;
+      const range = request.headers.get("range");
+      if (range) {
+        if (!range.startsWith("bytes=")) {
+          return new Response(null, { status: 416, headers: { "Content-Range": "bytes */" + bytes.byteLength } });
+        }
+        const parts = range.slice(6).split("-");
+        if (parts.length !== 2) return new Response(null, { status: 416, headers: { "Content-Range": "bytes */" + bytes.byteLength } });
+        if (parts[0] === "") {
+          const suffix = Number(parts[1]);
+          if (!Number.isInteger(suffix) || suffix <= 0) return new Response(null, { status: 416, headers: { "Content-Range": "bytes */" + bytes.byteLength } });
+          start = Math.max(0, bytes.byteLength - suffix);
+          end = bytes.byteLength - 1;
+        } else {
+          start = Number(parts[0]);
+          end = parts[1] ? Number(parts[1]) : bytes.byteLength - 1;
+        }
+        if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= bytes.byteLength) {
+          return new Response(null, { status: 416, headers: { "Content-Range": "bytes */" + bytes.byteLength } });
+        }
+        end = Math.min(end, bytes.byteLength - 1);
+        status = 206;
+      }
+      const body = bytes.subarray(start, end + 1);
+      const responseHeaders = new Headers();
+      responseHeaders.set("Content-Type", imported.contentType);
+      responseHeaders.set("Content-Disposition", 'inline; filename="' + imported.fileName.replaceAll('"', '') + '"');
+      responseHeaders.set("Accept-Ranges", "bytes");
+      responseHeaders.set("Cache-Control", "private, max-age=60");
+      responseHeaders.set("Content-Length", String(body.byteLength));
+      if (status === 206) responseHeaders.set("Content-Range", "bytes " + start + "-" + end + "/" + bytes.byteLength);
+      return new Response(body, { status, headers: responseHeaders });
+    }
+
+    if (!imported.audioObjectKey) return NextResponse.json({ error: "Staged storage object key is missing" }, { status: 503 });
     const storage = supabaseAdmin().storage.from(supabaseBucket);
     const signed = await storage.createSignedUrl(imported.audioObjectKey, 120);
     if (signed.error || !signed.data?.signedUrl) {
       return NextResponse.json({ error: "ASR storage could not sign the stored audio" }, { status: 503 });
     }
 
-    const url = new URL(request.url);
     if (url.searchParams.get("probe") === "1") {
       const upstream = await fetch(signed.data.signedUrl, {
         headers: { Range: "bytes=0-4095" },
@@ -84,6 +145,7 @@ export async function GET(request: Request, context: { params: Promise<{ importI
         status: imported.status,
         title: imported.title,
         artistName: imported.artistName,
+        storageBackend: imported.storageBackend,
         storageHttpStatus: upstream.status,
         storedContentType: imported.contentType,
         storedBytes: imported.fileSizeBytes,

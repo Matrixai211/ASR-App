@@ -272,13 +272,21 @@ async function main() {
         const originalFilename = String(track.orig_filename || "");
         const filename = safeName(extOf(originalFilename) === downloaded.format.ext ? originalFilename : slug(track.title) + "." + downloaded.format.ext);
         objectKey = "external/audius/" + String(track.id) + "/" + filename;
-        const upload = await supabase.storage.from(bucketName).upload(objectKey, downloaded.bytes, {
-          contentType: downloaded.format.mime,
-          cacheControl: "31536000",
-          upsert: true
-        });
-        if (upload.error) throw new Error("Supabase upload failed: " + upload.error.message);
-        uploaded = true;
+        let storageBackend = "SUPABASE";
+        let storageNote = null;
+        try {
+          const upload = await supabase.storage.from(bucketName).upload(objectKey, downloaded.bytes, {
+            contentType: downloaded.format.mime,
+            cacheControl: "31536000",
+            upsert: true
+          });
+          if (upload.error) throw new Error(upload.error.message);
+          uploaded = true;
+        } catch (storageError) {
+          storageBackend = "NEON_BYTEA";
+          storageNote = message(storageError);
+          await supabase.storage.from(bucketName).remove([objectKey]).catch(() => undefined);
+        }
 
         const artistName = track.user?.name || track.user?.handle ||
           (Array.isArray(track.artists) ? track.artists.map(artist => artist.name).filter(Boolean).join(", ") : "") || "Unknown artist";
@@ -295,7 +303,10 @@ async function main() {
             licenseBasis: decision.basis,
             attributionText,
             originalFilename: originalFilename || null,
-            audioObjectKey: objectKey,
+            audioObjectKey: storageBackend === "SUPABASE" ? objectKey : null,
+            audioData: storageBackend === "NEON_BYTEA" ? new Uint8Array(downloaded.bytes) : null,
+            storageBackend,
+            storageNote,
             fileName: filename,
             contentType: downloaded.format.mime,
             fileSizeBytes: downloaded.bytes.byteLength,
@@ -309,16 +320,28 @@ async function main() {
         });
         createdId = record.id;
 
-        const signed = await supabase.storage.from(bucketName).createSignedUrl(objectKey, 120);
-        if (signed.error || !signed.data?.signedUrl) throw new Error("Could not sign uploaded audio for verification");
-        const verification = await fetch(signed.data.signedUrl, {
-          headers: { Range: "bytes=0-4095" },
-          cache: "no-store",
-          signal: AbortSignal.timeout(15000)
-        });
-        if (!verification.ok && verification.status !== 206) throw new Error("Stored file verification returned HTTP " + verification.status);
-        const prefix = await readPrefix(verification);
-        if (!audioSignature(prefix)) throw new Error("Stored file failed audio signature verification");
+        if (storageBackend === "SUPABASE") {
+          const signed = await supabase.storage.from(bucketName).createSignedUrl(objectKey, 120);
+          if (signed.error || !signed.data?.signedUrl) throw new Error("Could not sign uploaded audio for verification");
+          const verification = await fetch(signed.data.signedUrl, {
+            headers: { Range: "bytes=0-4095" },
+            cache: "no-store",
+            signal: AbortSignal.timeout(15000)
+          });
+          if (!verification.ok && verification.status !== 206) throw new Error("Stored file verification returned HTTP " + verification.status);
+          const prefix = await readPrefix(verification);
+          if (!audioSignature(prefix)) throw new Error("Stored file failed audio signature verification");
+        } else {
+          const persisted = await prisma.audiusImport.findUnique({
+            where: { id: record.id },
+            select: { audioData: true, fileSizeBytes: true, sha256: true }
+          });
+          if (!persisted?.audioData) throw new Error("Neon audio fallback did not persist the audio bytes");
+          const persistedBytes = Buffer.from(persisted.audioData);
+          const persistedHash = createHash("sha256").update(persistedBytes).digest("hex");
+          if (persistedBytes.byteLength !== record.fileSizeBytes || persistedHash !== record.sha256) throw new Error("Neon fallback failed byte-count or SHA-256 verification");
+          if (!audioSignature(persistedBytes.subarray(0, 4096))) throw new Error("Neon fallback failed audio signature verification");
+        }
 
         console.log("ASR_AUDIUS_IMPORT_RESULT=" + JSON.stringify({
           ok: true,
@@ -334,6 +357,8 @@ async function main() {
           fileName: record.fileName,
           contentType: record.contentType,
           fileSizeBytes: record.fileSizeBytes,
+          storageBackend: record.storageBackend,
+          storageNote: record.storageNote,
           isOriginal: record.isOriginal,
           isOriginalAvailable: record.isOriginalAvailable,
           sha256: record.sha256,
