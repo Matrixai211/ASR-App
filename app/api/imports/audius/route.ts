@@ -197,21 +197,30 @@ function extensionOf(value: string) {
 async function downloadAudio(track: AudiusTrack) {
   const id = encodeURIComponent(String(track.id));
   const originalAvailable = track.is_original_available === true;
-  const queries = originalAvailable
-    ? ["?original=true&app_name=ASRRecords", "?original=false&app_name=ASRRecords", "?app_name=ASRRecords"]
-    : ["?app_name=ASRRecords", "?original=false&app_name=ASRRecords"];
+  const endpoints = originalAvailable
+    ? [
+        { path: "/download?original=true&app_name=ASRRecords", originalRequested: true },
+        { path: "/stream?app_name=ASRRecords", originalRequested: false },
+        { path: "/download?original=false&app_name=ASRRecords", originalRequested: false },
+        { path: "/download?app_name=ASRRecords", originalRequested: false },
+      ]
+    : [
+        { path: "/stream?app_name=ASRRecords", originalRequested: false },
+        { path: "/download?app_name=ASRRecords", originalRequested: false },
+        { path: "/download?original=false&app_name=ASRRecords", originalRequested: false },
+      ];
   let lastError = "No downloadable audio file was returned";
   for (const base of AUDIUS_BASES) {
-    for (const query of queries) {
+    for (const endpoint of endpoints) {
       try {
-        const response = await fetch(base + "/tracks/" + id + "/download" + query, {
+        const response = await fetch(base + "/tracks/" + id + endpoint.path, {
           redirect: "follow",
           cache: "no-store",
           headers: { Accept: "audio/*,application/octet-stream", "User-Agent": "ASRRecords/0.4" },
           signal: AbortSignal.timeout(25000),
         });
         if (!response.ok) {
-          lastError = "Audius download returned HTTP " + response.status;
+          lastError = "Audius audio endpoint returned HTTP " + response.status;
           continue;
         }
         const bytes = await readLimited(response);
@@ -222,7 +231,7 @@ async function downloadAudio(track: AudiusTrack) {
           continue;
         }
         const originalExt = extensionOf(String(track.orig_filename || ""));
-        const isOriginal = originalAvailable && query.includes("original=true") && (!originalExt || originalExt === detected.ext);
+        const isOriginal = originalAvailable && endpoint.originalRequested && (!originalExt || originalExt === detected.ext);
         return { bytes, format: detected, isOriginal, responseContentType: mime };
       } catch (error) {
         lastError = errorMessage(error);
