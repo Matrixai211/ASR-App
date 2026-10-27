@@ -203,3 +203,31 @@ model PaymentTransaction {
   @@index([userId, createdAt])
   @@index([status])
 }
+
+
+model AudiusImport {
+  id                    String   @id @default(cuid())
+  providerTrackId       String   @unique
+  title                 String
+  artistName            String
+  sourceUrl             String?
+  sourceLicense         String?
+  licenseBasis          String
+  attributionText       String
+  originalFilename      String?
+  audioObjectKey        String   @unique
+  fileName              String
+  contentType            String
+  fileSizeBytes          Int
+  durationSeconds        Int?
+  isOriginal             Boolean  @default(false)
+  isDownloadable         Boolean  @default(false)
+  isOriginalAvailable    Boolean  @default(false)
+  sha256                 String
+  status                 String   @default("STAGED")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([artistName])
+  @@index([status])
+}
