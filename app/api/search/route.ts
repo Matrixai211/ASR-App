@@ -79,16 +79,16 @@ export async function GET(req: NextRequest) {
   try {
     const [artists, releases, tracks] = await Promise.all([
       prisma.artistProfile.findMany({
-        where: { stageName: { contains: q, mode: 'insensitive' } },
+        where: { stageName: { contains: q, mode: 'insensitive' }, releases: { some: { status: 'PUBLISHED' } } },
         take: 10,
       }),
       prisma.release.findMany({
-        where: { title: { contains: q, mode: 'insensitive' } },
+        where: { title: { contains: q, mode: 'insensitive' }, status: 'PUBLISHED' },
         include: { artist: true },
         take: 10,
       }),
       prisma.track.findMany({
-        where: { title: { contains: q, mode: 'insensitive' } },
+        where: { title: { contains: q, mode: 'insensitive' }, release: { is: { status: 'PUBLISHED' } } },
         include: { release: { include: { artist: true } } },
         take: 20,
       }),
