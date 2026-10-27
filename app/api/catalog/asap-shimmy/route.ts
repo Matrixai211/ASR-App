@@ -46,12 +46,19 @@ export async function POST() {
       return NextResponse.json({ error: 'Only the verified ASAP Shimmy artist profile can manage Cactus masters. Contact ASR staff if this is your profile.' }, { status: 403 });
     }
   } else if (['ADMIN', 'MODERATOR'].includes(role || '')) {
-    if (!artist) {
-      artist = await prisma.artistProfile.create({
-        data: { userId: session.user.id, stageName: asapShimmy.name, country: 'Uganda', bio: asapShimmy.bio },
+    if (!artist || artist.stageName.trim().toLowerCase() !== asapShimmy.name.toLowerCase()) {
+      const asapProfile = await prisma.artistProfile.findFirst({
+        where: { stageName: { equals: asapShimmy.name, mode: 'insensitive' } },
       });
-    } else if (artist.stageName.trim().toLowerCase() !== asapShimmy.name.toLowerCase()) {
-      return NextResponse.json({ error: 'Use a dedicated verified ASAP Shimmy account to manage Cactus masters.' }, { status: 409 });
+      if (asapProfile) {
+        artist = asapProfile;
+      } else if (!artist) {
+        artist = await prisma.artistProfile.create({
+          data: { userId: session.user.id, stageName: asapShimmy.name, country: 'Uganda', bio: asapShimmy.bio },
+        });
+      } else {
+        return NextResponse.json({ error: 'Create a dedicated ASAP Shimmy artist account before initializing Cactus masters.' }, { status: 409 });
+      }
     }
   } else {
     return NextResponse.json({ error: 'Artist or staff access required' }, { status: 403 });
