@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
   const historyWithArtwork = await Promise.all(history.map(async (event) => {
     const artworkUrl = event.track.release.artworkUrl;
-    if (!artworkUrl || /^https?:\\/\\//i.test(artworkUrl)) return event;
+    if (!artworkUrl || /^https?:\/\//i.test(artworkUrl)) return event;
     try {
       const { data, error } = await supabaseAdmin().storage.from(supabaseBucket).createSignedUrl(artworkUrl, 300);
       return {
