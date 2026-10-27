@@ -134,6 +134,8 @@ model Release {
   copyrightOwner        String?
   masterRightsOwner     String?
   publishingRightsOwner String?
+  rightsAttestedAt      DateTime?
+  rightsAttestedBy      String?
   copyrightYear         Int?
   upc                   String?       @unique
   artist                ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
