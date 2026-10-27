@@ -13,7 +13,7 @@ ASR (Asap Shimmy Records) is a distribution-first music platform combining strea
 - Label services
 - Admin/moderation architecture
 - `/api/health` endpoint
-
+- A&R
 ## Stack
 Next.js App Router + TypeScript. PostgreSQL persistence, object storage, authentication and payment integrations are the next implementation layer.
 
