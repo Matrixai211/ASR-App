@@ -2,6 +2,54 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
 import { getPesapalIpnId, getPesapalToken, submitPesapalOrder } from '../../../lib/pesapal';
+import { getPremiumEntitlement } from '../../../lib/premium';
+
+export async function GET(req: NextRequest) {
+  const session = await auth.api.getSession({ headers: req.headers }).catch(() => null);
+  const configuredPrice = Number(process.env.ASR_PREMIUM_PRICE_UGX);
+  const priceUgx = Number.isFinite(configuredPrice) && configuredPrice > 0 ? Math.round(configuredPrice) : null;
+  const publicPlan = {
+    priceUgx,
+    currency: 'UGX',
+    durationDays: 30,
+    entitlements: {
+      exclusiveReleases: false,
+      eligibleDownloads: false,
+      adFreePlayback: false,
+      offlinePlayer: false,
+      smartMixes: false,
+    },
+  };
+  if (!session?.user) {
+    return NextResponse.json({
+      ...publicPlan,
+      subscription: { tier: 'FREE', status: 'FREE', active: false, renewsAt: null },
+    });
+  }
+
+  try {
+    const entitlement = await getPremiumEntitlement(session.user.id);
+    const storedTier = entitlement.subscription?.tier;
+    return NextResponse.json({
+      ...publicPlan,
+      subscription: {
+        tier: entitlement.active ? 'PREMIUM' : 'FREE',
+        status: entitlement.active ? 'ACTIVE' : storedTier === 'PREMIUM' ? 'EXPIRED' : 'FREE',
+        active: entitlement.active,
+        renewsAt: entitlement.renewsAt,
+      },
+      entitlements: {
+        exclusiveReleases: entitlement.active,
+        eligibleDownloads: entitlement.active,
+        adFreePlayback: false,
+        offlinePlayer: false,
+        smartMixes: false,
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: 'Could not load subscription status' }, { status: 503 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers }).catch(() => null);
@@ -9,6 +57,15 @@ export async function POST(req: NextRequest) {
 
   const { tier } = await req.json().catch(() => ({ tier: null }));
   if (tier !== 'PREMIUM') return NextResponse.json({ error: 'Unsupported tier' }, { status: 400 });
+
+  const entitlement = await getPremiumEntitlement(session.user.id).catch(() => null);
+  if (!entitlement) return NextResponse.json({ error: 'Could not verify subscription status' }, { status: 503 });
+  if (entitlement.active) {
+    return NextResponse.json({
+      error: 'Your ASR Premium membership is already active.',
+      renewsAt: entitlement.renewsAt,
+    }, { status: 409 });
+  }
 
   const premiumPrice = Number(process.env.ASR_PREMIUM_PRICE_UGX);
   if (!process.env.PESAPAL_CONSUMER_KEY || !process.env.PESAPAL_CONSUMER_SECRET || !Number.isFinite(premiumPrice) || premiumPrice <= 0) {

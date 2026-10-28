@@ -4,10 +4,8 @@ import { prisma } from './prisma';
 
 const productionUrl =
   process.env.BETTER_AUTH_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : undefined) ||
-  'https://asr-app-manassehzechariah90-1884.vercel.app';
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'http://localhost:3000';
 
 export const auth = betterAuth({
   baseURL: productionUrl,

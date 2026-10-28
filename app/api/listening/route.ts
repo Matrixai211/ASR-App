@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
+import { supabaseAdmin, supabaseBucket } from '../../../lib/supabase';
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers }).catch(() => null);
@@ -14,8 +15,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid listening event' }, { status: 400 });
   }
 
-  const track = await prisma.track.findUnique({ where: { id: trackId }, select: { id: true } });
-  if (!track) return NextResponse.json({ error: 'Track not found' }, { status: 404 });
+  const track = await prisma.track.findUnique({ where: { id: trackId }, select: { id: true, release: { select: { status: true } } } });
+  if (!track || track.release.status !== 'PUBLISHED') return NextResponse.json({ error: 'Track not found' }, { status: 404 });
 
   const event = await prisma.playEvent.create({
     data: {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   const history = await prisma.playEvent.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, track: { is: { release: { is: { status: 'PUBLISHED' } } } } },
     orderBy: { createdAt: 'desc' },
     take: 50,
     include: {
@@ -50,5 +51,22 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ history });
+  const historyWithArtwork = await Promise.all(history.map(async (event) => {
+    const artworkUrl = event.track.release.artworkUrl;
+    if (!artworkUrl || /^https?:\/\//i.test(artworkUrl)) return event;
+    try {
+      const { data, error } = await supabaseAdmin().storage.from(supabaseBucket).createSignedUrl(artworkUrl, 300);
+      return {
+        ...event,
+        track: {
+          ...event.track,
+          release: { ...event.track.release, artworkUrl: error ? null : data?.signedUrl || null },
+        },
+      };
+    } catch {
+      return { ...event, track: { ...event.track, release: { ...event.track.release, artworkUrl: null } } };
+    }
+  }));
+
+  return NextResponse.json({ history: historyWithArtwork });
 }

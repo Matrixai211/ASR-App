@@ -104,6 +104,15 @@ export async function reconcilePesapalPayment(orderTrackingId: string, merchantR
   const payment = await prisma.paymentTransaction.findUnique({ where: { txRef: merchantReference } });
   if (!payment || payment.provider !== 'pesapal') return { state: 'missing' as const };
 
+  // Pesapal may deliver both a browser callback and one or more IPNs for the same payment.
+  // Never extend the same 30-day purchase twice.
+  if (payment.status === 'SUCCESSFUL') {
+    if (payment.providerTransactionId && payment.providerTransactionId !== orderTrackingId) {
+      return { state: 'missing' as const };
+    }
+    return { state: 'completed' as const, alreadyProcessed: true };
+  }
+
   const status = await getPesapalTransactionStatus(orderTrackingId);
   const description = status.payment_status_description?.toUpperCase();
   const amountMatches = Number(status.amount) === payment.amountMinor;

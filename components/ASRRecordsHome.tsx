@@ -131,6 +131,7 @@ export default function ASRRecordsHome() {
           <a href="#about" onClick={() => setMenuOpen(false)}>About</a>
           <a href="/search">Search</a>
           <a href="/player">Player</a>
+          <a href="/premium">Premium</a>
         </nav>
       </div>
     </header>
