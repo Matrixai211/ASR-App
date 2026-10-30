@@ -4,13 +4,12 @@ import { auth } from '../../../../../../lib/auth';
 import { prisma } from '../../../../../../lib/prisma';
 
 const staffRoles = new Set(['ADMIN', 'MODERATOR']);
-const allowedStatuses = new Set([
-  'IN_REVIEW',
-  'CHANGES_REQUESTED',
-  'APPROVED',
-  'PUBLISHED',
-  'REJECTED',
-]);
+const allowedTransitions: Record<string, string[]> = {
+  SUBMITTED: ['IN_REVIEW'],
+  IN_REVIEW: ['CHANGES_REQUESTED', 'APPROVED', 'REJECTED'],
+  CHANGES_REQUESTED: ['IN_REVIEW'],
+  APPROVED: ['PUBLISHED', 'REJECTED'],
+};
 
 export async function PATCH(
   request: NextRequest,
@@ -35,9 +34,9 @@ export async function PATCH(
   }
 
   const status = typeof body.status === 'string' ? body.status : '';
-  if (!allowedStatuses.has(status)) {
+  if (!Object.values(allowedTransitions).some((statuses) => statuses.includes(status))) {
     return NextResponse.json(
-      { error: 'Invalid moderation status', allowed: [...allowedStatuses] },
+      { error: 'Invalid moderation status', allowed: [...new Set(Object.values(allowedTransitions).flat())] },
       { status: 400 },
     );
   }
@@ -47,9 +46,25 @@ export async function PATCH(
     return NextResponse.json({ error: 'Release not found' }, { status: 404 });
   }
 
-  const updated = await prisma.release.update({
-    where: { id },
+  if (!allowedTransitions[existing.status]?.includes(status)) {
+    return NextResponse.json(
+      { error: `Cannot move a release from ${existing.status} to ${status}` },
+      { status: 409 },
+    );
+  }
+
+  // Compare-and-set prevents simultaneous moderation requests from overwriting
+  // a newer status transition.
+  const changed = await prisma.release.updateMany({
+    where: { id, status: existing.status },
     data: { status: status as typeof existing.status },
+  });
+  if (changed.count !== 1) {
+    return NextResponse.json({ error: 'Release status changed; refresh and try again' }, { status: 409 });
+  }
+
+  const updated = await prisma.release.findUnique({
+    where: { id },
     include: { artist: true, tracks: { orderBy: { trackNumber: 'asc' } } },
   });
 

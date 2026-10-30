@@ -104,8 +104,6 @@ export async function reconcilePesapalPayment(orderTrackingId: string, merchantR
   const payment = await prisma.paymentTransaction.findUnique({ where: { txRef: merchantReference } });
   if (!payment || payment.provider !== 'pesapal') return { state: 'missing' as const };
 
-  // Pesapal may deliver both a browser callback and one or more IPNs for the same payment.
-  // Never extend the same 30-day purchase twice.
   if (payment.status === 'SUCCESSFUL') {
     if (payment.providerTransactionId && payment.providerTransactionId !== orderTrackingId) {
       return { state: 'missing' as const };
@@ -120,20 +118,34 @@ export async function reconcilePesapalPayment(orderTrackingId: string, merchantR
   const referenceMatches = status.merchant_reference === payment.txRef;
 
   if (description === 'COMPLETED' && amountMatches && currencyMatches && referenceMatches) {
-    const existing = await prisma.subscription.findUnique({ where: { userId: payment.userId } });
-    const base = existing?.active && existing.renewsAt && existing.renewsAt > new Date() ? existing.renewsAt.getTime() : Date.now();
-    const renewsAt = new Date(base + 30 * 24 * 60 * 60 * 1000);
-
-    await prisma.$transaction([
-      prisma.paymentTransaction.update({
-        where: { id: payment.id },
+    // Claim the pending payment atomically before extending membership. This prevents
+    // simultaneous browser-callback/IPN requests from granting the same 30 days twice.
+    return prisma.$transaction(async (tx) => {
+      const claimed = await tx.paymentTransaction.updateMany({
+        where: { id: payment.id, status: 'PENDING' },
         data: {
           status: 'SUCCESSFUL',
           providerTransactionId: orderTrackingId,
           paidAt: payment.paidAt ?? new Date(),
         },
-      }),
-      prisma.subscription.upsert({
+      });
+
+      if (claimed.count !== 1) {
+        const current = await tx.paymentTransaction.findUnique({ where: { id: payment.id } });
+        if (current?.status === 'SUCCESSFUL' && current.providerTransactionId === orderTrackingId) {
+          return { state: 'completed' as const, alreadyProcessed: true };
+        }
+        return { state: 'missing' as const };
+      }
+
+      const existing = await tx.subscription.findUnique({ where: { userId: payment.userId } });
+      const now = Date.now();
+      const base = existing?.active && existing.renewsAt && existing.renewsAt > new Date(now)
+        ? existing.renewsAt.getTime()
+        : now;
+      const renewsAt = new Date(base + 30 * 24 * 60 * 60 * 1000);
+
+      await tx.subscription.upsert({
         where: { userId: payment.userId },
         create: {
           userId: payment.userId,
@@ -150,21 +162,22 @@ export async function reconcilePesapalPayment(orderTrackingId: string, merchantR
           active: true,
           renewsAt,
         },
-      }),
-    ]);
-    return { state: 'completed' as const, status };
+      });
+
+      return { state: 'completed' as const, status };
+    });
   }
 
   if (description === 'FAILED' || description === 'INVALID' || description === 'REVERSED') {
-    await prisma.paymentTransaction.update({
-      where: { id: payment.id },
+    await prisma.paymentTransaction.updateMany({
+      where: { id: payment.id, status: 'PENDING' },
       data: { status: 'FAILED', providerTransactionId: orderTrackingId },
     });
     return { state: 'failed' as const, status };
   }
 
-  await prisma.paymentTransaction.update({
-    where: { id: payment.id },
+  await prisma.paymentTransaction.updateMany({
+    where: { id: payment.id, status: 'PENDING' },
     data: { providerTransactionId: orderTrackingId },
   }).catch(() => null);
   return { state: 'pending' as const, status };
